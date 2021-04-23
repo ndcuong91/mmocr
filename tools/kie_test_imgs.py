@@ -12,6 +12,24 @@ from mmcv.runner import load_checkpoint
 from mmocr.datasets import build_dataloader, build_dataset
 from mmocr.models import build_detector
 
+config_path='../configs/kie/sdmgr/sdmgr_unet16_60e_wildreceipt.py'
+checkpoint_path='../weights/sdmgr_unet16_60e_wildreceipt_20210405-16a47642.pth'
+save_dir_path='../viz'
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description='MMOCR visualize for kie model.')
+    parser.add_argument('--config', help='Test config file path.', default=config_path)
+    parser.add_argument('--checkpoint', help='Checkpoint file.',default=checkpoint_path)
+    parser.add_argument('--show', action='store_true', help='Show results.')
+    parser.add_argument(
+        '--show-dir', help='Directory where the output images will be saved.', default=save_dir_path)
+    parser.add_argument('--local_rank', type=int, default=0)
+    args = parser.parse_args()
+    if 'LOCAL_RANK' not in os.environ:
+        os.environ['LOCAL_RANK'] = str(args.local_rank)
+
+    return args
 
 def test(model, data_loader, show=False, out_dir=None):
     model.eval()
@@ -49,22 +67,6 @@ def test(model, data_loader, show=False, out_dir=None):
         for _ in range(batch_size):
             prog_bar.update()
     return results
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description='MMOCR visualize for kie model.')
-    parser.add_argument('config', help='Test config file path.')
-    parser.add_argument('checkpoint', help='Checkpoint file.')
-    parser.add_argument('--show', action='store_true', help='Show results.')
-    parser.add_argument(
-        '--show-dir', help='Directory where the output images will be saved.')
-    parser.add_argument('--local_rank', type=int, default=0)
-    args = parser.parse_args()
-    if 'LOCAL_RANK' not in os.environ:
-        os.environ['LOCAL_RANK'] = str(args.local_rank)
-
-    return args
 
 
 def main():
