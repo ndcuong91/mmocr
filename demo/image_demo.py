@@ -7,6 +7,10 @@ from mmocr.apis.inference import model_inference
 from mmocr.datasets import build_dataset  # noqa: F401
 from mmocr.models import build_detector  # noqa: F401
 
+img_path=''
+config = ''
+checkpoint=''
+save_path=''
 
 def main():
     parser = ArgumentParser()

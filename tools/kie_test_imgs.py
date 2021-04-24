@@ -13,7 +13,7 @@ from mmocr.datasets import build_dataloader, build_dataset
 from mmocr.models import build_detector
 
 config_path='../configs/kie/sdmgr/sdmgr_unet16_60e_wildreceipt.py'
-checkpoint_path='../weights/sdmgr_unet16_60e_wildreceipt_20210405-16a47642.pth'
+checkpoint_path='../weights/kie/sdmgr_unet16_60e_wildreceipt_20210405-16a47642.pth'
 save_dir_path='../viz'
 
 def parse_args():

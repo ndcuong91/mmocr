@@ -1,6 +1,6 @@
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
-max_scale, min_scale = 1024, 512
+max_scale, min_scale = 2048, 1024
 
 train_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -26,7 +26,7 @@ test_pipeline = [
 ]
 
 dataset_type = 'KIEDataset'
-data_root = '/home/duycuong/home_data/mmocr/kie/wildreceipt'
+data_root = '/home/duycuong/home_data/mmocr/kie/finance_invoices'
 
 loader = dict(
     type='HardDiskLoader',
@@ -53,20 +53,20 @@ test = dict(
     test_mode=True)
 
 data = dict(
-    samples_per_gpu=4, workers_per_gpu=0, train=train, val=test, test=test)
+    samples_per_gpu=2, workers_per_gpu=0, train=train, val=test, test=test)
 
 evaluation = dict(
     interval=1,
     metric='macro_f1',
     metric_options=dict(
         macro_f1=dict(
-            ignores=[0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 25])))
+            ignores=[0, 3, 6, 8, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31])))
 
 model = dict(
     type='SDMGR',
     backbone=dict(type='UNet', base_channels=16),
     bbox_head=dict(
-        type='SDMGRHead', visual_dim=16, num_chars=92, num_classes=26),
+        type='SDMGRHead', visual_dim=16, num_chars=240, num_classes=32),
     visual_modality=True,
     train_cfg=None,
     test_cfg=None,
@@ -80,7 +80,7 @@ lr_config = dict(
     warmup_iters=1,
     warmup_ratio=1,
     step=[40, 50])
-total_epochs = 60
+total_epochs = 100
 
 checkpoint_config = dict(interval=1)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])

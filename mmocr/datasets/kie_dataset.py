@@ -139,7 +139,7 @@ class KIEDataset(BaseDataset):
                  metric_options=dict(macro_f1=dict(ignores=[])),
                  **kwargs):
         # allow some kwargs to pass through
-        assert set(kwargs).issubset(['logger'])
+        # assert set(kwargs).issubset(['logger'])
 
         # Protect ``metric_options`` since it uses mutable value as default
         metric_options = copy.deepcopy(metric_options)
