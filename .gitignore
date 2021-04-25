@@ -136,4 +136,4 @@ htmlcov
 log.txt
 workspace.code-workspace
 results
-viz/image_files/
+viz/

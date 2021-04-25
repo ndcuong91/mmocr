@@ -26,7 +26,7 @@ test_pipeline = [
 ]
 
 dataset_type = 'KIEDataset'
-data_root = '/home/duycuong/home_data/mmocr/kie/wildreceipt'
+data_root = '/home/duycuong/home_data/mmocr/kie/sale_contracts'
 
 loader = dict(
     type='HardDiskLoader',
@@ -43,6 +43,14 @@ train = dict(
     loader=loader,
     dict_file=f'{data_root}/dict.txt',
     test_mode=False)
+val = dict(
+    type=dataset_type,
+    ann_file=f'{data_root}/val.txt',
+    pipeline=test_pipeline,
+    img_prefix=data_root,
+    loader=loader,
+    dict_file=f'{data_root}/dict.txt',
+    test_mode=True)
 test = dict(
     type=dataset_type,
     ann_file=f'{data_root}/test.txt',
@@ -53,20 +61,20 @@ test = dict(
     test_mode=True)
 
 data = dict(
-    samples_per_gpu=4, workers_per_gpu=0, train=train, val=test, test=test)
+    samples_per_gpu=4, workers_per_gpu=0, train=train, val=val, test=val)
 
 evaluation = dict(
     interval=1,
     metric='macro_f1',
     metric_options=dict(
         macro_f1=dict(
-            ignores=[0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 25])))
+            ignores=[0, 11])))
 
 model = dict(
     type='SDMGR',
     backbone=dict(type='UNet', base_channels=16),
     bbox_head=dict(
-        type='SDMGRHead', visual_dim=16, num_chars=92, num_classes=26),
+        type='SDMGRHead', visual_dim=16, num_chars=240, num_classes=12),
     visual_modality=True,
     train_cfg=None,
     test_cfg=None,

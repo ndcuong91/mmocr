@@ -35,7 +35,7 @@ def convert_PICK_data_to_mmocr(PICK_data_dir, PICK_key_file, entity_list, output
     with open(os.path.join(output_mmocr_data_dir, 'class_list.txt'), 'w') as f:
         f.write(class_list_txt)
 
-    print('get train list and val list from PICK dataset')
+    print('get train list, val list and test list from PICK dataset')
     PICK_train_list = []
     with open(os.path.join(PICK_data_dir, 'train_list.csv'), 'r', encoding='utf-8') as f:
         train_list = f.readlines()
@@ -56,8 +56,19 @@ def convert_PICK_data_to_mmocr(PICK_data_dir, PICK_key_file, entity_list, output
         img_name = line[idx + 1:].replace('\n', '')
         PICK_val_list.append(img_name)
 
+    PICK_test_list = []
+    with open(os.path.join(PICK_data_dir, 'test_list.csv'), 'r', encoding='utf-8') as f:
+        test_list = f.readlines()
+    for line in test_list:
+        idx = -1
+        for i in range(0, 2):
+            idx = line.find(',', idx + 1)
+        img_name = line[idx + 1:].replace('\n', '')
+        PICK_test_list.append(img_name)
+
     print('convert annotation from PICK to mmocr')
     train_mmocr_txt = ''
+    val_mmocr_txt = ''
     test_mmocr_txt = ''
     entity_not_in_entity_list = []
     for idx, img_name in enumerate(list_img_files):
@@ -100,23 +111,24 @@ def convert_PICK_data_to_mmocr(PICK_data_dir, PICK_key_file, entity_list, output
         if img_name in PICK_train_list:
             train_mmocr_txt += mmocr_dict_str + '\n'
         elif img_name in PICK_val_list:
+            val_mmocr_txt += mmocr_dict_str + '\n'
+        elif img_name in PICK_test_list:
             test_mmocr_txt += mmocr_dict_str + '\n'
         else:
-            print(img_name, 'not in PICK train list or PICK val list')
+            print(img_name, 'not in PICK train list, PICK val list or PICK test list')
     train_mmocr_txt= train_mmocr_txt.rstrip('\n')
+    val_mmocr_txt= val_mmocr_txt.rstrip('\n')
     test_mmocr_txt= test_mmocr_txt.rstrip('\n')
 
     print(entity_not_in_entity_list, 'not in entity list')
 
     with open(os.path.join(output_mmocr_data_dir, 'train.txt'), 'w', encoding='utf-8') as outfile:
         outfile.write(train_mmocr_txt)
+    with open(os.path.join(output_mmocr_data_dir, 'val.txt'), 'w', encoding='utf-8') as outfile:
+        outfile.write(val_mmocr_txt)
     with open(os.path.join(output_mmocr_data_dir, 'test.txt'), 'w', encoding='utf-8') as outfile:
         outfile.write(test_mmocr_txt)
 
-    # with codecs.open(os.path.join(output_mmocr_data_dir, 'train.txt'), 'w', encoding='utf-8') as f:
-    #     json.dump(train_mmocr_list, f, ensure_ascii=False)
-    # with codecs.open(os.path.join(output_mmocr_data_dir, 'test.txt'), 'w', encoding='utf-8') as f:
-    #     json.dump(test_mmocr_list, f, ensure_ascii=False)
     print('copy imgs file from PICK to mmocr')
     mmocr_img_dir = os.path.join(output_mmocr_data_dir, 'image_files')
     if not os.path.exists(mmocr_img_dir):
@@ -130,19 +142,13 @@ def convert_PICK_data_to_mmocr(PICK_data_dir, PICK_key_file, entity_list, output
                     os.path.join(mmocr_img_dir, img_name))
     print('Done!')
 
-
 if __name__ == '__main__':
-    PICK_data_dir = '/home/duycuong/home_data/mmocr/kie/data_pick_invoice/data_train_pick'
+    PICK_data_dir = '/home/duycuong/home_data/mmocr/kie/sale_contracts_PICK'
     PICK_key_file = '/home/duycuong/PycharmProjects/vvn/demo_read_document/demo_app/kie_models/PICK/utils/keys_vietnamese.txt'
-    output_mmocr_data_dir = '/home/duycuong/home_data/mmocr/kie/finance_invoices'
-    Entities_list = ['buyer', 'seller', 'company_name', 'company_name_val', 'account_no',
-                     'address', 'address_val', 'tax_code', 'tax_code_val',
-                     'website', 'bank', 'date',
-                     'form', 'form_val', 'no', 'no_val', 'serial', 'serial_val',
-                     'total', 'total_val', 'grand_total', 'grand_total_val',
-                     'exchange_rate', 'exchange_rate_val',
-                     'VAT_amount', 'VAT_amount_val', 'VAT_rate', 'VAT_rate_val',
-                     'amount_in_words', 'amount_in_words_val', 'other']
+    output_mmocr_data_dir = '/home/duycuong/home_data/mmocr/kie/sale_contracts'
+    Entities_list = ['contract_no','exporter_name','exporter_add','importer_name','payment_method',
+                 'ben_bank_name','ben_add','ben_name','ben_acc','swift_code', 'other']
+
     convert_PICK_data_to_mmocr(PICK_data_dir=PICK_data_dir,
                                PICK_key_file=PICK_key_file,
                                entity_list=Entities_list,

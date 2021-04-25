@@ -12,9 +12,9 @@ from mmcv.runner import load_checkpoint
 from mmocr.datasets import build_dataloader, build_dataset
 from mmocr.models import build_detector
 
-config_path='../configs/kie/sdmgr/sdmgr_unet16_60e_wildreceipt.py'
-checkpoint_path='../weights/kie/sdmgr_unet16_60e_wildreceipt_20210405-16a47642.pth'
-save_dir_path='../viz'
+config_path='../configs/kie/sdmgr/sdmgr_unet16_60e_sale_contracts.py'
+checkpoint_path='../work_dirs/kie/sale_contracts/latest.pth'
+save_dir_path='../viz/sale_contracts'
 
 def parse_args():
     parser = argparse.ArgumentParser(
