@@ -41,7 +41,7 @@ class SDMGR(SingleStageDetector):
         if visual_modality:
             self.extractor = build_roi_extractor({
                 **extractor, 'out_channels':
-                self.backbone.base_channels
+                    self.backbone.base_channels
             })
             self.maxpool = nn.MaxPool2d(extractor['roi_layer']['output_size'])
         else:
@@ -144,7 +144,8 @@ class SDMGR(SingleStageDetector):
             show=show,
             win_name=win_name,
             wait_time=wait_time,
-            out_file=out_file)
+            out_file=out_file,
+            ignore_classes=['other'])
 
         if not (show or out_file):
             warnings.warn('show==False and out_file is not specified, only '

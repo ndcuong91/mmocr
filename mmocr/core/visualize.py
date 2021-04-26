@@ -377,7 +377,8 @@ def imshow_edge_node(img,
                      show=False,
                      win_name='',
                      wait_time=-1,
-                     out_file=None):
+                     out_file=None,
+                     ignore_classes=[]):
 
     img = mmcv.imread(img)
     h, w = img.shape[:2]
@@ -387,16 +388,16 @@ def imshow_edge_node(img,
     node_pred_label = max_idx.numpy().tolist()
     node_pred_score = max_value.numpy().tolist()
 
+
+    vis_img = np.ones((h, int(w * 1.5), 3), dtype=np.uint8) * 255
+    vis_img[:, :w] = img
+
     for i, box in enumerate(boxes):
         new_box = [[box[0], box[1]], [box[2], box[1]], [box[2], box[3]],
                    [box[0], box[3]]]
         Pts = np.array([new_box], np.int32)
-        cv2.polylines(
-            img, [Pts.reshape((-1, 1, 2))],
-            True,
-            color=(255, 255, 0),
-            thickness=1)
         x_min = int(min([point[0] for point in new_box]))
+        x_max = int(max([point[0] for point in new_box]))
         y_min = int(min([point[1] for point in new_box]))
 
         pred_label = str(node_pred_label[i])
@@ -404,12 +405,16 @@ def imshow_edge_node(img,
             pred_label = idx_to_cls[pred_label]
         pred_score = '{:.2f}'.format(node_pred_score[i])
         text = pred_label + '(' + pred_score + ')'
-        cv2.putText(pred_img, text, (x_min * 2, y_min),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+        if pred_label not in ignore_classes:
+            cv2.putText(vis_img, text, (x_max, y_min),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+            cv2.polylines(
+                vis_img, [Pts.reshape((-1, 1, 2))],
+                True,
+                color=(255, 255, 0),
+                thickness=1)
 
-    vis_img = np.ones((h, w * 3, 3), dtype=np.uint8) * 255
-    vis_img[:, :w] = img
-    vis_img[:, w:] = pred_img
+    # vis_img[:, w:] = pred_img
 
     if show:
         mmcv.imshow(vis_img, win_name, wait_time)
