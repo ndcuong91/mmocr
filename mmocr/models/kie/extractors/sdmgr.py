@@ -136,7 +136,7 @@ class SDMGR(SingleStageDetector):
         if out_file is not None:
             show = False
 
-        img = imshow_edge_node(
+        img, node_pred = imshow_edge_node(
             img,
             result,
             boxes,
@@ -150,6 +150,6 @@ class SDMGR(SingleStageDetector):
         if not (show or out_file):
             warnings.warn('show==False and out_file is not specified, only '
                           'result image will be returned')
-            return img
+            return img, node_pred
 
-        return img
+        return img, node_pred

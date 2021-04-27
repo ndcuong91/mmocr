@@ -8,6 +8,18 @@ def get_list_file_in_folder(dir, ext=['jpg', 'png', 'JPG', 'PNG']):
                   if any(fn.endswith(ext) for ext in included_extensions)]
     return file_names
 
+def get_list_img_from_PICK_csv(PICK_csv_path):
+    PICK_img_list = []
+    with open(PICK_csv_path, 'r', encoding='utf-8') as f:
+        train_list = f.readlines()
+    for line in train_list:
+        idx = -1
+        for i in range(0, 2):
+            idx = line.find(',', idx + 1)
+        img_name = line[idx + 1:].replace('\n', '')
+        PICK_img_list.append(img_name)
+    return PICK_img_list
+
 
 def convert_PICK_data_to_mmocr(PICK_data_dir, PICK_key_file, entity_list, output_mmocr_data_dir):
     boxes_and_transcripts_dir = os.path.join(PICK_data_dir, 'boxes_and_transcripts')
@@ -36,35 +48,9 @@ def convert_PICK_data_to_mmocr(PICK_data_dir, PICK_key_file, entity_list, output
         f.write(class_list_txt)
 
     print('get train list, val list and test list from PICK dataset')
-    PICK_train_list = []
-    with open(os.path.join(PICK_data_dir, 'train_list.csv'), 'r', encoding='utf-8') as f:
-        train_list = f.readlines()
-    for line in train_list:
-        idx = -1
-        for i in range(0, 2):
-            idx = line.find(',', idx + 1)
-        img_name = line[idx + 1:].replace('\n', '')
-        PICK_train_list.append(img_name)
-
-    PICK_val_list = []
-    with open(os.path.join(PICK_data_dir, 'val_list.csv'), 'r', encoding='utf-8') as f:
-        val_list = f.readlines()
-    for line in val_list:
-        idx = -1
-        for i in range(0, 2):
-            idx = line.find(',', idx + 1)
-        img_name = line[idx + 1:].replace('\n', '')
-        PICK_val_list.append(img_name)
-
-    PICK_test_list = []
-    with open(os.path.join(PICK_data_dir, 'test_list.csv'), 'r', encoding='utf-8') as f:
-        test_list = f.readlines()
-    for line in test_list:
-        idx = -1
-        for i in range(0, 2):
-            idx = line.find(',', idx + 1)
-        img_name = line[idx + 1:].replace('\n', '')
-        PICK_test_list.append(img_name)
+    PICK_train_list = get_list_img_from_PICK_csv(os.path.join(PICK_data_dir, 'train_list.csv'))
+    PICK_val_list = get_list_img_from_PICK_csv(os.path.join(PICK_data_dir, 'val_list.csv'))
+    PICK_test_list = get_list_img_from_PICK_csv(os.path.join(PICK_data_dir, 'test_list.csv'))
 
     print('convert annotation from PICK to mmocr')
     train_mmocr_txt = ''

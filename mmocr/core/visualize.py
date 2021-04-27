@@ -396,9 +396,8 @@ def imshow_edge_node(img,
         new_box = [[box[0], box[1]], [box[2], box[1]], [box[2], box[3]],
                    [box[0], box[3]]]
         Pts = np.array([new_box], np.int32)
-        x_min = int(min([point[0] for point in new_box]))
         x_max = int(max([point[0] for point in new_box]))
-        y_min = int(min([point[1] for point in new_box]))
+        y_max = int(max([point[1] for point in new_box]))
 
         pred_label = str(node_pred_label[i])
         if pred_label in idx_to_cls:
@@ -406,8 +405,8 @@ def imshow_edge_node(img,
         pred_score = '{:.2f}'.format(node_pred_score[i])
         text = pred_label + '(' + pred_score + ')'
         if pred_label not in ignore_classes:
-            cv2.putText(vis_img, text, (x_max, y_min),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+            cv2.putText(vis_img, text, (x_max, y_max),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 0, 255), 1)
             cv2.polylines(
                 vis_img, [Pts.reshape((-1, 1, 2))],
                 True,
@@ -421,4 +420,4 @@ def imshow_edge_node(img,
     if out_file is not None:
         mmcv.imwrite(vis_img, out_file)
 
-    return vis_img
+    return vis_img, node_pred_label
