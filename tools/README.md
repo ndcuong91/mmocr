@@ -6,7 +6,7 @@ Entities_list = ['contract_no','exporter_name','exporter_add','importer_name','p
 
 Ignore 'other'
 
-| **Method** |  **train** |  **val** | **test** | ***input_size** | **Speed** | **Ckpt size** | **Note** |
+| **Method** |  **train** |  **val** | **test** | **input_size** | **speed** | **ckpt size** | **note** |
 | ------- | --------- | -------- | --------- | ---------- | ---------- | ---------- |---------- |
 | PICK  | 0.8501   | 0.7961   | 0.7117 | 768x1088 | 3.3 fps | 890Mb | mEF 0.9019|
 | SDMGR  | 0.9859   | 0.975    |  0.7809 | min: 512 max: 1024 | 10 fps | 20Mb | epoch 43|
@@ -20,7 +20,7 @@ Entities_list = ['VAT_amount', 'VAT_amount_val', 'VAT_rate', 'VAT_rate_val', 'ac
 
 Ignore 'other'
 
-| **Method** |  **train** |  **val** | **test** | ***input_size** | **Speed** | **Ckpt size** | **Note** |
+| **Method** |  **train** |  **val** | **test** | **input_size** | **speed** | **ckpt size** | **note** |
 | ------- | --------- | -------- | --------- | ---------- | ---------- | ---------- |---------- |
 | PICK  | 0.6949   | 0.6667   | 0. | 704 x 992 | 3.3 fps | 890Mb | mEF 0.9484|
 | SDMGR  | 0.9188   | 0.8828    |  0. | min: 512 max: 1024 | 10 fps | 20Mb | epoch 39|
