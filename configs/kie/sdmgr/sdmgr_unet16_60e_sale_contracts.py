@@ -61,7 +61,7 @@ test = dict(
     test_mode=True)
 
 data = dict(
-    samples_per_gpu=4, workers_per_gpu=0, train=train, val=val, test=val)
+    samples_per_gpu=4, workers_per_gpu=0, train=train, val=val, test=test)
 
 evaluation = dict(
     interval=1,
