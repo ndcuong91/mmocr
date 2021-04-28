@@ -1,6 +1,6 @@
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
-max_scale, min_scale = 2048, 1024
+max_scale, min_scale =  1024, 512
 
 train_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -43,6 +43,14 @@ train = dict(
     loader=loader,
     dict_file=f'{data_root}/dict.txt',
     test_mode=False)
+val = dict(
+    type=dataset_type,
+    ann_file=f'{data_root}/val.txt',
+    pipeline=test_pipeline,
+    img_prefix=data_root,
+    loader=loader,
+    dict_file=f'{data_root}/dict.txt',
+    test_mode=True)
 test = dict(
     type=dataset_type,
     ann_file=f'{data_root}/test.txt',
@@ -53,14 +61,15 @@ test = dict(
     test_mode=True)
 
 data = dict(
-    samples_per_gpu=2, workers_per_gpu=0, train=train, val=test, test=test)
+    samples_per_gpu=4, workers_per_gpu=0, train=train, val=val, test=test)
 
 evaluation = dict(
     interval=1,
     metric='macro_f1',
     metric_options=dict(
         macro_f1=dict(
-            ignores=[0, 3, 6, 8, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31])))
+            #ignores=[0, 3, 6, 8, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31])))
+            ignores=[0, 31])))
 
 model = dict(
     type='SDMGR',
@@ -80,7 +89,7 @@ lr_config = dict(
     warmup_iters=1,
     warmup_ratio=1,
     step=[40, 50])
-total_epochs = 100
+total_epochs = 60
 
 checkpoint_config = dict(interval=1)
 log_config = dict(interval=50, hooks=[dict(type='TextLoggerHook')])

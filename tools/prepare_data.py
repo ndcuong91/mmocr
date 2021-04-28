@@ -129,11 +129,19 @@ def convert_PICK_data_to_mmocr(PICK_data_dir, PICK_key_file, entity_list, output
     print('Done!')
 
 if __name__ == '__main__':
-    PICK_data_dir = '/home/duycuong/home_data/mmocr/kie/sale_contracts_PICK'
+    PICK_data_dir = '/home/duycuong/home_data/finance_invoices_PICK'
     PICK_key_file = '/home/duycuong/PycharmProjects/vvn/demo_read_document/demo_app/kie_models/PICK/utils/keys_vietnamese.txt'
-    output_mmocr_data_dir = '/home/duycuong/home_data/mmocr/kie/sale_contracts'
-    Entities_list = ['contract_no','exporter_name','exporter_add','importer_name','payment_method',
-                 'ben_bank_name','ben_add','ben_name','ben_acc','swift_code', 'other']
+    output_mmocr_data_dir = '/home/duycuong/home_data/mmocr/kie/finance_invoices'
+    # Entities_list = ['contract_no','exporter_name','exporter_add','importer_name','payment_method',
+    #              'ben_bank_name','ben_add','ben_name','ben_acc','swift_code', 'other']
+    Entities_list = ['buyer', 'seller', 'company_name', 'company_name_val', 'account_no',
+                     'address', 'address_val', 'tax_code', 'tax_code_val',
+                     'website', 'bank', 'date',
+                     'form', 'form_val', 'no', 'no_val', 'serial', 'serial_val',
+                     'total', 'total_val', 'grand_total', 'grand_total_val',
+                     'exchange_rate', 'exchange_rate_val',
+                     'VAT_amount', 'VAT_amount_val', 'VAT_rate', 'VAT_rate_val',
+                     'amount_in_words', 'amount_in_words_val', 'other']
 
     convert_PICK_data_to_mmocr(PICK_data_dir=PICK_data_dir,
                                PICK_key_file=PICK_key_file,

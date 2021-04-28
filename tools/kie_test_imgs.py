@@ -8,13 +8,14 @@ from mmcv import Config
 from mmcv.image import tensor2imgs
 from mmcv.parallel import MMDataParallel
 from mmcv.runner import load_checkpoint
-
 from mmocr.datasets import build_dataloader, build_dataset
 from mmocr.models import build_detector
 
-config_path = '../work_dirs/kie/sale_contracts/sdmgr_unet16_60e_sale_contracts.py'
-checkpoint_path = '../work_dirs/kie/sale_contracts/epoch_81.pth'
-save_dir_path = '../viz/sale_contracts'
+from sklearn.metrics import f1_score
+
+config_path = '../work_dirs/kie/finance_invoices/20210427_182401/sdmgr_unet16_60e_finance_invoices.py'
+checkpoint_path = '../work_dirs/kie/finance_invoices/20210427_182401/epoch_39.pth'
+save_dir_path = '../viz/finance_invoices'
 
 
 def parse_args():
@@ -78,16 +79,32 @@ def test(model, data_loader, show=False, out_dir=None, eval=True):
         for _ in range(batch_size):
             prog_bar.update()
 
+    labels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+              30]
     if eval:
-        score = eval_marco_F1(y_pred=y_pred,
-                              y_gt=y_gt,
-                              labels=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-        print('\nScore:', score)
+        print('\nF1 scores of each class.................................................')
+        count = 0
+        total_F1 = 0
+        for label in labels:
+            score = eval_marco_F1(y_pred=y_pred,
+                                  y_gt=y_gt,
+                                  labels=[label],
+                                  )
+            print(str(label).ljust(20), score)
+            if score > -10:
+                count += 1
+                total_F1 += score
+        print('average F1 in', count, 'class:', total_F1 / count)
+
+
+        # score = eval_marco_F1(y_pred=y_pred,
+        #                       y_gt=y_gt,
+        #                       # labels=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        #                       labels=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10,11, 12, 13, 14, 15, 16, 17, 18, 19, 20,21, 22, 23, 24, 25, 26, 27, 28, 29, 30])
+        # print('\nScore:', score)
 
     return results
 
-
-from sklearn.metrics import f1_score
 
 
 def eval_marco_F1(y_pred, y_gt, labels=None):
@@ -98,7 +115,7 @@ def eval_marco_F1(y_pred, y_gt, labels=None):
     :param labels:
     :return:
     '''
-    return f1_score(y_gt, y_pred, labels=labels, average='macro')
+    return f1_score(y_gt, y_pred, labels=labels, average='macro', zero_division=0)
 
 
 def main():
