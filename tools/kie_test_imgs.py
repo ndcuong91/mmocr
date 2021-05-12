@@ -13,9 +13,9 @@ from mmocr.models import build_detector
 
 from sklearn.metrics import f1_score
 
-config_path = '../work_dirs/kie/finance_invoices/20210427_182401/sdmgr_unet16_60e_finance_invoices.py'
-checkpoint_path = '../work_dirs/kie/finance_invoices/20210427_182401/epoch_39.pth'
-save_dir_path = '../viz/finance_invoices'
+config_path = '../work_dirs/kie/sale_contracts/20210426_155845_100epoch/sdmgr_unet16_60e_sale_contracts.py'
+checkpoint_path = '../work_dirs/kie/sale_contracts/20210426_155845_100epoch/epoch_39.pth'
+save_dir_path = '../viz/sale_contracts'
 
 
 def parse_args():
@@ -129,6 +129,8 @@ def main():
 
     distributed = False
 
+    #sample
+    cfg.data.test.ann_file=''
     # build the dataloader
     dataset = build_dataset(cfg.data.test)
     data_loader = build_dataloader(

@@ -26,7 +26,7 @@ test_pipeline = [
 ]
 
 dataset_type = 'KIEDataset'
-data_root = '/home/duycuong/home_data/mmocr/kie/sale_contracts'
+data_root = '/home/vvn/PycharmProjects/mmocr/data/kie/sale_contracts'
 
 loader = dict(
     type='HardDiskLoader',
