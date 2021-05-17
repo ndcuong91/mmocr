@@ -37,9 +37,9 @@ train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='ResizeOCR',
-        height=48,
-        min_width=48,
-        max_width=160,
+        height=32,
+        min_width=32,
+        max_width=100,
         keep_aspect_ratio=True,
         width_downsample_ratio=0.25),
     dict(type='ToTensorOCR'),
@@ -59,9 +59,9 @@ test_pipeline = [
         transforms=[
             dict(
                 type='ResizeOCR',
-                height=48,
-                min_width=48,
-                max_width=160,
+                height=32,
+                min_width=32,
+                max_width=100,
                 keep_aspect_ratio=True,
                 width_downsample_ratio=0.25),
             dict(type='ToTensorOCR'),
@@ -77,13 +77,13 @@ test_pipeline = [
 
 dataset_type = 'OCRDataset'
 
-train_prefix = 'data/mixture/'
+train_prefix = '/home/vvn/home_data/mmocr/'
 
 train_img_prefix1 = train_prefix + 'icdar_2011'
 train_img_prefix2 = train_prefix + 'icdar_2013'
 train_img_prefix3 = train_prefix + 'icdar_2015'
 train_img_prefix4 = train_prefix + 'coco_text'
-train_img_prefix5 = train_prefix + 'III5K'
+train_img_prefix5 = train_prefix + 'IIIT5K'
 train_img_prefix6 = train_prefix + 'SynthText_Add'
 train_img_prefix7 = train_prefix + 'SynthText'
 train_img_prefix8 = train_prefix + 'Syn90k'
@@ -92,7 +92,7 @@ train_ann_file1 = train_prefix + 'icdar_2011/train_label.txt',
 train_ann_file2 = train_prefix + 'icdar_2013/train_label.txt',
 train_ann_file3 = train_prefix + 'icdar_2015/train_label.txt',
 train_ann_file4 = train_prefix + 'coco_text/train_label.txt',
-train_ann_file5 = train_prefix + 'III5K/train_label.txt',
+train_ann_file5 = train_prefix + 'IIIT5K/train_label.txt',
 train_ann_file6 = train_prefix + 'SynthText_Add/label.txt',
 train_ann_file7 = train_prefix + 'SynthText/shuffle_labels.txt',
 train_ann_file8 = train_prefix + 'Syn90k/shuffle_labels.txt'
@@ -151,7 +151,7 @@ train8 = {key: value for key, value in train6.items()}
 train8['img_prefix'] = train_img_prefix8
 train8['ann_file'] = train_ann_file8
 
-test_prefix = 'data/mixture/'
+test_prefix = '/home/vvn/home_data/mmocr/'
 test_img_prefix1 = test_prefix + 'IIIT5K/'
 test_img_prefix2 = test_prefix + 'svt/'
 test_img_prefix3 = test_prefix + 'icdar_2013/'
@@ -201,19 +201,29 @@ test6 = {key: value for key, value in test1.items()}
 test6['img_prefix'] = test_img_prefix6
 test6['ann_file'] = test_ann_file6
 
+# data = dict(
+#     samples_per_gpu=64,
+#     workers_per_gpu=2,
+#     train=dict(
+#         type='ConcatDataset',
+#         datasets=[
+#             train1, train2, train3, train4, train5, train6, train7, train8
+#         ]),
+#     val=dict(
+#         type='ConcatDataset',
+#         datasets=[test1, test2, test3, test4, test5, test6]),
+#     test=dict(
+#         type='ConcatDataset',
+#         datasets=[test1, test2, test3, test4, test5, test6]))
+
 data = dict(
-    samples_per_gpu=64,
-    workers_per_gpu=2,
-    train=dict(
-        type='ConcatDataset',
-        datasets=[
-            train1, train2, train3, train4, train5, train6, train7, train8
-        ]),
-    val=dict(
-        type='ConcatDataset',
-        datasets=[test1, test2, test3, test4, test5, test6]),
-    test=dict(
-        type='ConcatDataset',
-        datasets=[test1, test2, test3, test4, test5, test6]))
+    samples_per_gpu=128,
+    workers_per_gpu=4,
+    train=train5,
+    val=test1,
+    test=test1)
 
 evaluation = dict(interval=1, metric='acc')
+
+cudnn_benchmark = True
+

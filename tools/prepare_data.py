@@ -142,8 +142,16 @@ if __name__ == '__main__':
                      'exchange_rate', 'exchange_rate_val',
                      'VAT_amount', 'VAT_amount_val', 'VAT_rate', 'VAT_rate_val',
                      'amount_in_words', 'amount_in_words_val', 'other']
+    #
+    # convert_PICK_data_to_mmocr(PICK_data_dir=PICK_data_dir,
+    #                            PICK_key_file=PICK_key_file,
+    #                            entity_list=Entities_list,
+    #                            output_mmocr_data_dir=output_mmocr_data_dir)
 
-    convert_PICK_data_to_mmocr(PICK_data_dir=PICK_data_dir,
-                               PICK_key_file=PICK_key_file,
-                               entity_list=Entities_list,
-                               output_mmocr_data_dir=output_mmocr_data_dir)
+    import torch
+
+    ver = torch.backends.cudnn.version()
+    avai  =torch.backends.cudnn.is_available()
+    enable  = torch.backends.cudnn.enabled
+    benchmark  =torch.backends.cudnn.benchmark
+    kk=1
