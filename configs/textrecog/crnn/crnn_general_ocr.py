@@ -1,8 +1,8 @@
 _base_ = []
-checkpoint_config = dict(interval=5)
+checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
-    interval=10,
+    interval=100,
     hooks=[
         dict(type='TextLoggerHook')
 
@@ -16,7 +16,7 @@ workflow = [('train', 1)]
 
 # model
 label_convertor = dict(
-    type='CTCConvertor', dict_file='data/textrecog/handwriting1/dict.txt', with_unknown=False, lower=False)
+    type='CTCConvertor', dict_file='/home/cuongnd/home_data/ocr_Do/output/dict.txt', with_unknown=False, lower=False)
 
 model = dict(
     type='CRNNNet',
@@ -76,8 +76,8 @@ test_pipeline = [
 
 dataset_type = 'OCRDataset'
 
-train_img_prefix = '/home/cuongnd/PycharmProjects/mmocr/data/textrecog/handwriting1'
-train_ann_file = '/home/cuongnd/PycharmProjects/mmocr/data/textrecog/handwriting1/train.txt',
+train_img_prefix = '/home/cuongnd/home_data/ocr_Do/output'
+train_ann_file = '/home/cuongnd/home_data/ocr_Do/output/train.txt',
 train = dict(
     type=dataset_type,
     img_prefix=train_img_prefix,
@@ -94,8 +94,8 @@ train = dict(
     test_mode=False)
 
 
-test_img_prefix = '/home/cuongnd/PycharmProjects/mmocr/data/textrecog/handwriting1'
-test_ann_file = '/home/cuongnd/PycharmProjects/mmocr/data/textrecog/handwriting1/test.txt'
+test_img_prefix = '/home/cuongnd/home_data/ocr_Do/output'
+test_ann_file = '/home/cuongnd/home_data/ocr_Do/output/val.txt'
 
 test = dict(
     type=dataset_type,
@@ -119,5 +119,5 @@ data = dict(
     val= test,
     test=test)
 
-evaluation = dict(interval=5, metric='acc')
+evaluation = dict(interval=1, metric='acc')
 cudnn_benchmark = True

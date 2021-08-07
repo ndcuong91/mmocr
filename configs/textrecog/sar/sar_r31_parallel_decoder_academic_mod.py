@@ -77,7 +77,7 @@ test_pipeline = [
 
 dataset_type = 'OCRDataset'
 
-train_prefix = '/home/vvn/home_data/mmocr/'
+train_prefix = '/home/cuongnd/home_data/mmocr/textrecog/'
 
 train_img_prefix1 = train_prefix + 'icdar_2011'
 train_img_prefix2 = train_prefix + 'icdar_2013'
@@ -151,7 +151,7 @@ train8 = {key: value for key, value in train6.items()}
 train8['img_prefix'] = train_img_prefix8
 train8['ann_file'] = train_ann_file8
 
-test_prefix = '/home/vvn/home_data/mmocr/'
+test_prefix = '/home/cuongnd/home_data/mmocr/textrecog/'
 test_img_prefix1 = test_prefix + 'IIIT5K/'
 test_img_prefix2 = test_prefix + 'svt/'
 test_img_prefix3 = test_prefix + 'icdar_2013/'
@@ -223,7 +223,7 @@ data = dict(
     val=test1,
     test=test1)
 
-evaluation = dict(interval=1, metric='acc')
+evaluation = dict(interval=5, metric='acc')
 
 cudnn_benchmark = True
 

@@ -1,54 +1,48 @@
-_base_ = []
+_base_ = ['../../_base_/default_runtime.py']
+
 checkpoint_config = dict(interval=5)
-# yapf:disable
-log_config = dict(
-    interval=10,
-    hooks=[
-        dict(type='TextLoggerHook')
 
-    ])
-# yapf:enable
-dist_params = dict(backend='nccl')
-log_level = 'INFO'
-load_from = None
-resume_from = None
-workflow = [('train', 1)]
-
-# model
 label_convertor = dict(
-    type='CTCConvertor', dict_file='data/textrecog/handwriting1/dict.txt', with_unknown=False, lower=False)
+    type='AttnConvertor', dict_file='data/textrecog/handwriting1/dict.txt', with_unknown=False, lower=False)
 
 model = dict(
-    type='CRNNNet',
-    preprocessor=None,
-    backbone=dict(type='VeryDeepVgg', leakyRelu=False, input_channels=1),
-    encoder=None,
-    decoder=dict(type='CRNNDecoder', in_channels=512, rnn_flag=True),
-    loss=dict(type='CTCLoss'),
+    type='SARNet',
+    backbone=dict(type='ResNet31OCR'),
+    encoder=dict(
+        type='SAREncoder',
+        enc_bi_rnn=False,
+        enc_do_rnn=0.1,
+        enc_gru=False,
+    ),
+    decoder=dict(
+        type='ParallelSARDecoder',
+        enc_bi_rnn=False,
+        dec_bi_rnn=False,
+        dec_do_rnn=0,
+        dec_gru=False,
+        pred_dropout=0.1,
+        d_k=512,
+        pred_concat=True),
+    loss=dict(type='SARLoss'),
     label_convertor=label_convertor,
-    pretrained=None)
-
-train_cfg = None
-test_cfg = None
+    max_seq_len=30)
 
 # optimizer
-optimizer = dict(type='Adadelta', lr=1.0)
+optimizer = dict(type='Adam', lr=1e-3)
 optimizer_config = dict(grad_clip=None)
 # learning policy
-lr_config = dict(policy='step', step=[])
+lr_config = dict(policy='step', step=[3, 4])
 total_epochs = 100
 
-# data
-img_norm_cfg = dict(mean=[0.5], std=[0.5])
-
+img_norm_cfg = dict(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 train_pipeline = [
-    dict(type='LoadImageFromFile', color_type='grayscale'),
+    dict(type='LoadImageFromFile'),
     dict(
         type='ResizeOCR',
         height=32,
         min_width=32,
         max_width=1000,
-        keep_aspect_ratio=False),
+        keep_aspect_ratio=True),
     dict(type='ToTensorOCR'),
     dict(type='NormalizeOCR', **img_norm_cfg),
     dict(
@@ -59,7 +53,7 @@ train_pipeline = [
         ]),
 ]
 test_pipeline = [
-    dict(type='LoadImageFromFile', color_type='grayscale'),
+    dict(type='LoadImageFromFile'),
     dict(
         type='ResizeOCR',
         height=32,
@@ -93,7 +87,6 @@ train = dict(
     pipeline=train_pipeline,
     test_mode=False)
 
-
 test_img_prefix = '/home/cuongnd/PycharmProjects/mmocr/data/textrecog/handwriting1'
 test_ann_file = '/home/cuongnd/PycharmProjects/mmocr/data/textrecog/handwriting1/test.txt'
 
@@ -113,10 +106,10 @@ test = dict(
     test_mode=True)
 
 data = dict(
-    samples_per_gpu=64,
+    samples_per_gpu=16,
     workers_per_gpu=4,
     train=train,
-    val= test,
+    val=test,
     test=test)
 
 evaluation = dict(interval=5, metric='acc')
