@@ -1,11 +1,13 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import os.path as osp
 import tempfile
+from functools import partial
 
 import numpy as np
 import pytest
 import torch
-
 from mmdet.core import BitmapMasks
+
 from mmocr.models.textrecog.recognizer import (EncodeDecodeRecognizer,
                                                SegRecognizer)
 
@@ -27,7 +29,7 @@ def test_base_recognizer():
         type='CTCConvertor', dict_file=dict_file, with_unknown=False)
 
     preprocessor = None
-    backbone = dict(type='VeryDeepVgg', leakyRelu=False)
+    backbone = dict(type='VeryDeepVgg', leaky_relu=False)
     encoder = None
     decoder = dict(type='CRNNDecoder', in_channels=512, rnn_flag=True)
     loss = dict(type='CTCLoss')
@@ -59,7 +61,11 @@ def test_base_recognizer():
     assert feat.shape == torch.Size([1, 512, 1, 41])
 
     # test forward train
-    img_metas = [{'text': 'hello', 'valid_ratio': 1.0}]
+    img_metas = [{
+        'text': 'hello',
+        'resize_shape': (32, 120, 3),
+        'valid_ratio': 1.0
+    }]
     losses = recognizer.forward_train(imgs, img_metas)
     assert isinstance(losses, dict)
     assert 'loss_ctc' in losses
@@ -70,6 +76,22 @@ def test_base_recognizer():
     assert isinstance(results[0], dict)
     assert 'text' in results[0]
     assert 'score' in results[0]
+
+    # test onnx export
+    recognizer.forward = partial(
+        recognizer.simple_test,
+        img_metas=img_metas,
+        return_loss=False,
+        rescale=True)
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        onnx_path = f'{tmpdirname}/tmp.onnx'
+        torch.onnx.export(
+            recognizer, (imgs, ),
+            onnx_path,
+            input_names=['input'],
+            output_names=['output'],
+            export_params=True,
+            keep_initializers_as_inputs=False)
 
     # test aug_test
     aug_results = recognizer.aug_test([imgs, imgs], [img_metas, img_metas])
@@ -145,7 +167,11 @@ def test_seg_recognizer():
     gt_kernels = BitmapMasks([attn_tgt, segm_tgt, mask], 64, 256)
 
     # test forward train
-    img_metas = [{'text': 'hello', 'valid_ratio': 1.0}]
+    img_metas = [{
+        'text': 'hello',
+        'resize_shape': (64, 256, 3),
+        'valid_ratio': 1.0
+    }]
     losses = recognizer.forward_train(imgs, img_metas, gt_kernels=[gt_kernels])
     assert isinstance(losses, dict)
 

@@ -1,4 +1,6 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 from mmdet.datasets.builder import DATASETS
+
 from mmocr.core.evaluation.ocr_metric import eval_ocr_metric
 from mmocr.datasets.base_dataset import BaseDataset
 

@@ -1,3 +1,4 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import argparse
 import glob
 import os.path as osp
@@ -7,9 +8,8 @@ from functools import partial
 import mmcv
 import numpy as np
 from shapely.geometry import Polygon
-from tools.data.utils.common import convert_annotations, is_not_png
 
-from mmocr.utils import drop_orientation
+from mmocr.utils import convert_annotations, list_from_file
 
 
 def collect_files(img_dir, gt_dir, split):
@@ -35,10 +35,6 @@ def collect_files(img_dir, gt_dir, split):
     imgs_list = []
     for suffix in suffixes:
         imgs_list.extend(glob.glob(osp.join(img_dir, '*' + suffix)))
-
-    imgs_list = [
-        drop_orientation(f) if is_not_png(f) else f for f in imgs_list
-    ]
 
     files = []
     if split == 'training':
@@ -85,11 +81,8 @@ def collect_annotations(files, split, nproc=1):
 
 
 def load_txt_info(gt_file, img_info):
-    with open(gt_file) as f:
-        gt_list = f.readlines()
-
     anno_info = []
-    for line in gt_list:
+    for line in list_from_file(gt_file):
         # each line has one ploygen (n vetices), and one text.
         # e.g., 695,885,866,888,867,1146,696,1143,####Latin 9
         line = line.strip()
@@ -105,12 +98,14 @@ def load_txt_info(gt_file, img_info):
         # convert to COCO style XYWH format
         min_x, min_y, max_x, max_y = polygon.bounds
         bbox = [min_x, min_y, max_x - min_x, max_y - min_y]
+        text = strs[28][4:]
 
         anno = dict(
             iscrowd=iscrowd,
             category_id=category_id,
             bbox=bbox,
             area=area,
+            text=text,
             segmentation=[xy])
         anno_info.append(anno)
     img_info.update(anno_info=anno_info)
@@ -127,7 +122,7 @@ def load_xml_info(gt_file, img_info):
             w = box.attrib['width']
             x = box.attrib['left']
             y = box.attrib['top']
-            # label = box[0].text
+            text = box[0].text
             segs = box[1].text
             pts = segs.strip().split(',')
             pts = [int(x) for x in pts]
@@ -148,6 +143,7 @@ def load_xml_info(gt_file, img_info):
                 category_id=category_id,
                 bbox=bbox,
                 area=area,
+                text=text,
                 segmentation=[pts])
             anno_info.append(anno)
 
@@ -172,10 +168,6 @@ def load_img_info(files, split):
     img_file, gt_file = files
     # read imgs with ignoring orientations
     img = mmcv.imread(img_file, 'unchanged')
-    # read imgs with orientations as dataloader does when training and testing
-    img_color = mmcv.imread(img_file, 'color')
-    # make sure imgs have no orientations info, or annotation gt is wrong.
-    assert img.shape[0:2] == img_color.shape[0:2]
 
     split_name = osp.basename(osp.dirname(img_file))
     img_info = dict(
@@ -204,7 +196,7 @@ def parse_args():
     parser.add_argument(
         '--split-list',
         nargs='+',
-        help='a list of splits. e.g., "--split_list training test"')
+        help='a list of splits. e.g., "--split-list training test"')
 
     parser.add_argument(
         '--nproc', default=1, type=int, help='number of process')

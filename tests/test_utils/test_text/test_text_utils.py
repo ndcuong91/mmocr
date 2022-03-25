@@ -1,3 +1,4 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 """Test text label visualize."""
 import os.path as osp
 import random
@@ -57,7 +58,7 @@ def test_show_text_label(mock_imwrite, mock_imshow, mock_imread):
     visualize_utils.imshow_text_label(
         img, pred_label, gt_label, out_file=out_file)
     visualize_utils.imshow_text_label(
-        img, pred_label, gt_label, out_file=None, show=True)
+        img, '中文', '中文', out_file=None, show=True)
 
     # test showing img
     mock_imshow.assert_called_once()

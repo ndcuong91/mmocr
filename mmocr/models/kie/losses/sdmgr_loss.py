@@ -1,8 +1,9 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import torch
+from mmdet.models.losses import accuracy
 from torch import nn
 
-from mmdet.models.builder import LOSSES
-from mmdet.models.losses import accuracy
+from mmocr.models.builder import LOSSES
 
 
 @LOSSES.register_module()
@@ -14,7 +15,7 @@ class SDMGRLoss(nn.Module):
     https://arxiv.org/abs/2103.14470.
     """
 
-    def __init__(self, node_weight=1.0, edge_weight=1.0, ignore=0):
+    def __init__(self, node_weight=1.0, edge_weight=1.0, ignore=-100):
         super().__init__()
         self.loss_node = nn.CrossEntropyLoss(ignore_index=ignore)
         self.loss_edge = nn.CrossEntropyLoss(ignore_index=-1)
@@ -30,8 +31,9 @@ class SDMGRLoss(nn.Module):
         node_gts = torch.cat(node_gts).long()
         edge_gts = torch.cat(edge_gts).long()
 
-        node_valids = torch.nonzero(node_gts != self.ignore).view(-1)
-        edge_valids = torch.nonzero(edge_gts != -1).view(-1)
+        node_valids = torch.nonzero(
+            node_gts != self.ignore, as_tuple=False).view(-1)
+        edge_valids = torch.nonzero(edge_gts != -1, as_tuple=False).view(-1)
         return dict(
             loss_node=self.node_weight * self.loss_node(node_preds, node_gts),
             loss_edge=self.edge_weight * self.loss_edge(edge_preds, edge_gts),

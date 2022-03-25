@@ -1,3 +1,4 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import warnings
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
@@ -5,19 +6,16 @@ from collections import OrderedDict
 import mmcv
 import torch
 import torch.distributed as dist
-import torch.nn as nn
-from mmcv.runner import auto_fp16
-from mmcv.utils import print_log
+from mmcv.runner import BaseModule, auto_fp16
 
 from mmocr.core import imshow_text_label
-from mmocr.utils import get_root_logger
 
 
-class BaseRecognizer(nn.Module, metaclass=ABCMeta):
+class BaseRecognizer(BaseModule, metaclass=ABCMeta):
     """Base class for text recognition."""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, init_cfg=None):
+        super().__init__(init_cfg=init_cfg)
         self.fp16_enabled = False
 
     @abstractmethod
@@ -55,17 +53,6 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
         """
         pass
 
-    def init_weights(self, pretrained=None):
-        """Initialize the weights for detector.
-
-        Args:
-            pretrained (str, optional): Path to pre-trained weights.
-                Defaults to None.
-        """
-        if pretrained is not None:
-            logger = get_root_logger()
-            print_log(f'load model from: {pretrained}', logger=logger)
-
     def forward_test(self, imgs, img_metas, **kwargs):
         """
         Args:
@@ -75,11 +62,11 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
                 The outer list indicates images in a batch.
         """
         if isinstance(imgs, list):
-            assert len(imgs) == len(img_metas)
             assert len(imgs) > 0
             assert imgs[0].size(0) == 1, ('aug test does not support '
                                           f'inference with batch size '
                                           f'{imgs[0].size(0)}')
+            assert len(imgs) == len(img_metas)
             return self.aug_test(imgs, img_metas, **kwargs)
 
         return self.simple_test(imgs, img_metas, **kwargs)
@@ -92,8 +79,17 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
         Note that img and img_meta are single-nested (i.e. tensor and
         list[dict]).
         """
+
         if return_loss:
             return self.forward_train(img, img_metas, **kwargs)
+
+        if isinstance(img, list):
+            for idx, each_img in enumerate(img):
+                if each_img.dim() == 3:
+                    img[idx] = each_img.unsqueeze(0)
+        else:
+            if len(img_metas) == 1 and isinstance(img_metas[0], list):
+                img_metas = img_metas[0]
 
         return self.forward_test(img, img_metas, **kwargs)
 
@@ -102,7 +98,7 @@ class BaseRecognizer(nn.Module, metaclass=ABCMeta):
 
         Args:
             losses (dict): Raw outputs of the network, which usually contain
-                losses and other necessary infomation.
+                losses and other necessary information.
 
         Returns:
             tuple[tensor, dict]: (loss, log_vars), loss is the loss tensor

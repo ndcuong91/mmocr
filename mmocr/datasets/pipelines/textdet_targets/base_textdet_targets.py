@@ -1,10 +1,11 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import sys
 
 import cv2
 import numpy as np
-import Polygon as plg
 import pyclipper
 from mmcv.utils import print_log
+from shapely.geometry import Polygon as plg
 
 import mmocr.utils.check_argument as check_argument
 
@@ -109,7 +110,7 @@ class BaseTextDetTargets:
 
         for text_ind, poly in enumerate(text_polys):
             instance = poly[0].reshape(-1, 2).astype(np.int32)
-            area = plg.Polygon(instance).area()
+            area = plg(instance).area
             peri = cv2.arcLength(instance, True)
             distance = min(
                 int(area * (1 - shrink_ratio * shrink_ratio) / (peri + 0.001) +
@@ -117,23 +118,22 @@ class BaseTextDetTargets:
             pco = pyclipper.PyclipperOffset()
             pco.AddPath(instance, pyclipper.JT_ROUND,
                         pyclipper.ET_CLOSEDPOLYGON)
-            shrinked = np.array(pco.Execute(-distance))
+            shrunk = np.array(pco.Execute(-distance))
 
-            # check shrinked == [] or empty ndarray
-            if len(shrinked) == 0 or shrinked.size == 0:
+            # check shrunk == [] or empty ndarray
+            if len(shrunk) == 0 or shrunk.size == 0:
                 if ignore_tags is not None:
                     ignore_tags[text_ind] = True
                 continue
             try:
-                shrinked = np.array(shrinked[0]).reshape(-1, 2)
+                shrunk = np.array(shrunk[0]).reshape(-1, 2)
 
             except Exception as e:
-                print_log(f'{shrinked} with error {e}')
+                print_log(f'{shrunk} with error {e}')
                 if ignore_tags is not None:
                     ignore_tags[text_ind] = True
                 continue
-            cv2.fillPoly(text_kernel, [shrinked.astype(np.int32)],
-                         text_ind + 1)
+            cv2.fillPoly(text_kernel, [shrunk.astype(np.int32)], text_ind + 1)
         return text_kernel, ignore_tags
 
     def generate_effective_mask(self, mask_size: tuple, polygons_ignore):

@@ -1,3 +1,4 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import numpy as np
 
 import mmocr.utils as utils
@@ -32,9 +33,9 @@ def compute_recall_precision(gt_polys, pred_polys):
             gt = gt_polys[gt_id]
             det = pred_polys[pred_id]
 
-            inter_area, _ = eval_utils.poly_intersection(det, gt)
-            gt_area = gt.area()
-            det_area = det.area()
+            inter_area = eval_utils.poly_intersection(det, gt)
+            gt_area = gt.area
+            det_area = det.area
             if gt_area != 0:
                 recall[gt_id, pred_id] = inter_area / gt_area
             if det_area != 0:
@@ -52,7 +53,7 @@ def eval_hmean_ic13(det_boxes,
                     one2one_score=1.,
                     one2many_score=0.8,
                     many2one_score=1.):
-    """Evalute hmean of text detection using the icdar2013 standard.
+    """Evaluate hmean of text detection using the icdar2013 standard.
 
     Args:
         det_boxes (list[list[list[float]]]): List of arrays of shape (n, 2k).

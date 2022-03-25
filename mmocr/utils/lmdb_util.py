@@ -1,3 +1,4 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import shutil
 import sys
 import time
@@ -5,11 +6,16 @@ from pathlib import Path
 
 import lmdb
 
+from mmocr.utils import list_from_file
 
-def lmdb_converter(img_list, output, batch_size=1000, coding='utf-8'):
-    # read img_list
-    with open(img_list) as f:
-        lines = f.readlines()
+
+def lmdb_converter(img_list_file,
+                   output,
+                   batch_size=1000,
+                   coding='utf-8',
+                   lmdb_map_size=109951162776):
+    # read img_list_file
+    lines = list_from_file(img_list_file)
 
     # create lmdb database
     if Path(output).is_dir():
@@ -19,11 +25,11 @@ def lmdb_converter(img_list, output, batch_size=1000, coding='utf-8'):
             if Yn in ['Y', 'y']:
                 shutil.rmtree(output)
                 break
-            elif Yn in ['N', 'n']:
+            if Yn in ['N', 'n']:
                 return
     print('create database %s' % output)
     Path(output).mkdir(parents=True, exist_ok=False)
-    env = lmdb.open(output, map_size=1099511627776)
+    env = lmdb.open(output, map_size=lmdb_map_size)
 
     # build lmdb
     beg_time = time.strftime('%H:%M:%S')

@@ -1,5 +1,6 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import torch.nn as nn
-from mmcv.cnn import xavier_init
+from mmcv.runner import Sequential
 
 from mmocr.models.builder import DECODERS
 from mmocr.models.textrecog.layers import BidirectionalLSTM
@@ -8,30 +9,42 @@ from .base_decoder import BaseDecoder
 
 @DECODERS.register_module()
 class CRNNDecoder(BaseDecoder):
+    """Decoder for CRNN.
+
+    Args:
+        in_channels (int): Number of input channels.
+        num_classes (int): Number of output classes.
+        rnn_flag (bool): Use RNN or CNN as the decoder.
+        init_cfg (dict or list[dict], optional): Initialization configs.
+    """
 
     def __init__(self,
                  in_channels=None,
                  num_classes=None,
                  rnn_flag=False,
+                 init_cfg=dict(type='Xavier', layer='Conv2d'),
                  **kwargs):
-        super().__init__()
+        super().__init__(init_cfg=init_cfg)
         self.num_classes = num_classes
         self.rnn_flag = rnn_flag
 
         if rnn_flag:
-            self.decoder = nn.Sequential(
+            self.decoder = Sequential(
                 BidirectionalLSTM(in_channels, 256, 256),
                 BidirectionalLSTM(256, 256, num_classes))
         else:
             self.decoder = nn.Conv2d(
                 in_channels, num_classes, kernel_size=1, stride=1)
 
-    def init_weights(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                xavier_init(m)
-
     def forward_train(self, feat, out_enc, targets_dict, img_metas):
+        """
+        Args:
+            feat (Tensor): A Tensor of shape :math:`(N, H, 1, W)`.
+
+        Returns:
+            Tensor: The raw logit tensor. Shape :math:`(N, W, C)` where
+            :math:`C` is ``num_classes``.
+        """
         assert feat.size(2) == 1, 'feature height must be 1'
         if self.rnn_flag:
             x = feat.squeeze(2)  # [N, C, W]
@@ -46,4 +59,12 @@ class CRNNDecoder(BaseDecoder):
         return outputs
 
     def forward_test(self, feat, out_enc, img_metas):
+        """
+        Args:
+            feat (Tensor): A Tensor of shape :math:`(N, H, 1, W)`.
+
+        Returns:
+            Tensor: The raw logit tensor. Shape :math:`(N, W, C)` where
+            :math:`C` is ``num_classes``.
+        """
         return self.forward_train(feat, out_enc, None, img_metas)

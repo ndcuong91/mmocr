@@ -1,10 +1,9 @@
-import glob
 import os
+import os.path as osp
+import shutil
+import sys
+import warnings
 from setuptools import find_packages, setup
-
-import torch
-from torch.utils.cpp_extension import (CUDA_HOME, BuildExtension, CppExtension,
-                                       CUDAExtension)
 
 
 def readme():
@@ -14,12 +13,74 @@ def readme():
 
 
 version_file = 'mmocr/version.py'
+is_windows = sys.platform == 'win32'
+
+
+def add_mim_extention():
+    """Add extra files that are required to support MIM into the package.
+
+    These files will be added by creating a symlink to the originals if the
+    package is installed in `editable` mode (e.g. pip install -e .), or by
+    copying from the originals otherwise.
+    """
+
+    # parse installment mode
+    if 'develop' in sys.argv:
+        # installed by `pip install -e .`
+        mode = 'symlink'
+    elif 'sdist' in sys.argv or 'bdist_wheel' in sys.argv:
+        # installed by `pip install .`
+        # or create source distribution by `python setup.py sdist`
+        mode = 'copy'
+    else:
+        return
+
+    filenames = ['tools', 'configs', 'model-index.yml']
+    repo_path = osp.dirname(__file__)
+    mim_path = osp.join(repo_path, 'mmocr', '.mim')
+    os.makedirs(mim_path, exist_ok=True)
+
+    for filename in filenames:
+        if osp.exists(filename):
+            src_path = osp.join(repo_path, filename)
+            tar_path = osp.join(mim_path, filename)
+
+            if osp.isfile(tar_path) or osp.islink(tar_path):
+                os.remove(tar_path)
+            elif osp.isdir(tar_path):
+                shutil.rmtree(tar_path)
+
+            if mode == 'symlink':
+                src_relpath = osp.relpath(src_path, osp.dirname(tar_path))
+                try:
+                    os.symlink(src_relpath, tar_path)
+                except OSError:
+                    # Creating a symbolic link on windows may raise an
+                    # `OSError: [WinError 1314]` due to privilege. If
+                    # the error happens, the src file will be copied
+                    mode = 'copy'
+                    warnings.warn(
+                        f'Failed to create a symbolic link for {src_relpath}, '
+                        f'and it will be copied to {tar_path}')
+                else:
+                    continue
+
+            if mode == 'copy':
+                if osp.isfile(src_path):
+                    shutil.copyfile(src_path, tar_path)
+                elif osp.isdir(src_path):
+                    shutil.copytree(src_path, tar_path)
+                else:
+                    warnings.warn(f'Cannot copy file {src_path}.')
+            else:
+                raise ValueError(f'Invalid mode {mode}')
 
 
 def get_version():
     with open(version_file, 'r') as f:
         exec(compile(f.read(), version_file, 'exec'))
     import sys
+
     # return short version for sdist
     if 'sdist' in sys.argv or 'bdist_wheel' in sys.argv:
         return locals()['short_version']
@@ -39,9 +100,9 @@ def parse_requirements(fname='requirements.txt', with_version=True):
     CommandLine:
         python -c "import setup; print(setup.parse_requirements())"
     """
+    import re
     import sys
     from os.path import exists
-    import re
     require_fpath = fname
 
     def parse_line(line):
@@ -101,47 +162,12 @@ def parse_requirements(fname='requirements.txt', with_version=True):
     return packages
 
 
-def get_rroi_align_extensions():
-    extensions_dir = 'mmocr/models/utils/ops/rroi_align/csrc/csc'
-    main_file = glob.glob(os.path.join(extensions_dir, '*.cpp'))
-    source_cpu = glob.glob(os.path.join(extensions_dir, 'cpu', '*.cpp'))
-    source_cuda = glob.glob(os.path.join(extensions_dir, 'cuda', '*.cu'))
-    sources = main_file + source_cpu
-    extension = CppExtension
-    extra_compile_args = {'cxx': []}
-    define_macros = []
-
-    if torch.cuda.is_available() and CUDA_HOME is not None:
-        extension = CUDAExtension
-        sources += source_cuda
-        define_macros += [('WITH_CUDA', None)]
-        extra_compile_args['nvcc'] = [
-            '-DCUDA_HAS_FP16=1',
-            '-D__CUDA_NO_HALF_OPERATORS__',
-            '-D__CUDA_NO_HALF_CONVERSIONS__',
-            '-D__CUDA_NO_HALF2_OPERATORS__',
-        ]
-
-    print(sources)
-    include_dirs = [extensions_dir]
-    print('include_dirs', include_dirs, flush=True)
-    ext = extension(
-        name='mmocr.models.utils.ops.rroi_align.csrc',
-        sources=sources,
-        include_dirs=include_dirs,
-        define_macros=define_macros,
-        extra_compile_args=extra_compile_args,
-    )
-
-    return ext
-
-
 if __name__ == '__main__':
+    add_mim_extention()
     library_dirs = [
         lp for lp in os.environ.get('LD_LIBRARY_PATH', '').split(':')
         if len(lp) > 1
     ]
-    cpp_root = 'mmocr/models/textdet/postprocess/'
     setup(
         name='mmocr',
         version=get_version(),
@@ -152,8 +178,8 @@ if __name__ == '__main__':
         maintainer_email='openmmlab@gmail.com',
         keywords='Text Detection, OCR, KIE, NLP',
         packages=find_packages(exclude=('configs', 'tools', 'demo')),
+        include_package_data=True,
         url='https://github.com/open-mmlab/mmocr',
-        package_data={'mmocr.ops': ['*/*.so']},
         classifiers=[
             'Development Status :: 4 - Beta',
             'License :: OSI Approved :: Apache Software License',
@@ -162,10 +188,9 @@ if __name__ == '__main__':
             'Programming Language :: Python :: 3.6',
             'Programming Language :: Python :: 3.7',
             'Programming Language :: Python :: 3.8',
+            'Programming Language :: Python :: 3.9',
         ],
         license='Apache License 2.0',
-        setup_requires=parse_requirements('requirements/build.txt'),
-        tests_require=parse_requirements('requirements/tests.txt'),
         install_requires=parse_requirements('requirements/runtime.txt'),
         extras_require={
             'all': parse_requirements('requirements.txt'),
@@ -173,14 +198,4 @@ if __name__ == '__main__':
             'build': parse_requirements('requirements/build.txt'),
             'optional': parse_requirements('requirements/optional.txt'),
         },
-        ext_modules=[
-            CppExtension(
-                name='mmocr.models.textdet.postprocess.pan',
-                sources=[cpp_root + 'pan.cpp']),
-            CppExtension(
-                name='mmocr.models.textdet.postprocess.pse',
-                sources=[cpp_root + 'pse.cpp']),
-            get_rroi_align_extensions()
-        ],
-        cmdclass={'build_ext': BuildExtension},
         zip_safe=False)

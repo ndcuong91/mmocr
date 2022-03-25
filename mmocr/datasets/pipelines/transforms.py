@@ -1,14 +1,17 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import math
 
 import cv2
+import mmcv
 import numpy as np
 import torchvision.transforms as transforms
-from PIL import Image
-
-import mmocr.core.evaluation.utils as eval_utils
 from mmdet.core import BitmapMasks, PolygonMasks
 from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines.transforms import Resize
+from PIL import Image
+from shapely.geometry import Polygon as plg
+
+import mmocr.core.evaluation.utils as eval_utils
 from mmocr.utils import check_argument
 
 
@@ -86,18 +89,19 @@ class RandomCropInstances:
         canvas_poly = eval_utils.box2polygon(canvas_bbox)
         tl = canvas_bbox[0:2]
 
-        for inx, bbox in enumerate(bboxes):
+        for idx, bbox in enumerate(bboxes):
             poly = eval_utils.box2polygon(bbox)
-            area, inters = eval_utils.poly_intersection(poly, canvas_poly)
+            area, inters = eval_utils.poly_intersection(
+                poly, canvas_poly, return_poly=True)
             if area == 0:
                 continue
-            xmin, xmax, ymin, ymax = inters.boundingBox()
+            xmin, ymin, xmax, ymax = inters.bounds
             kept_bboxes += [
                 np.array(
                     [xmin - tl[0], ymin - tl[1], xmax - tl[0], ymax - tl[1]],
                     dtype=np.float32)
             ]
-            kept_inx += [inx]
+            kept_inx += [idx]
 
         if len(kept_inx) == 0:
             return np.array([]).astype(np.float32).reshape(0, 4), kept_inx
@@ -111,8 +115,8 @@ class RandomCropInstances:
             return gt_mask.masks[0]
         if type == 'union_all':
             mask = gt_mask.masks[0].copy()
-            for inx in range(1, len(gt_mask.masks)):
-                mask = np.logical_or(mask, gt_mask.masks[inx])
+            for idx in range(1, len(gt_mask.masks)):
+                mask = np.logical_or(mask, gt_mask.masks[idx])
             return mask
 
         raise NotImplementedError
@@ -146,15 +150,15 @@ class RandomCropInstances:
                     ori_labels = results['gt_labels']
                     ori_inst_num = len(ori_labels)
                     results['gt_labels'] = [
-                        ori_labels[inx] for inx in range(ori_inst_num)
-                        if inx in kept_inx
+                        ori_labels[idx] for idx in range(ori_inst_num)
+                        if idx in kept_inx
                     ]
                 # ignore g_masks accordingly
                 if 'gt_masks' in results:
                     ori_mask = results['gt_masks'].masks
                     kept_mask = [
-                        ori_mask[inx] for inx in range(ori_inst_num)
-                        if inx in kept_inx
+                        ori_mask[idx] for idx in range(ori_inst_num)
+                        if idx in kept_inx
                     ]
                     target_h, target_w = bbox[3] - bbox[1], bbox[2] - bbox[0]
                     if len(kept_inx) > 0:
@@ -408,37 +412,42 @@ class RandomCropPolyInstances:
                                 region_ends[region_ind])
         return start, end
 
-    def sample_crop_box(self, img_size, masks):
+    def sample_crop_box(self, img_size, results):
         """Generate crop box and make sure not to crop the polygon instances.
 
         Args:
-            img_size (tuple(int)): The image size.
-            masks (list[list[ndarray]]): The polygon masks.
+            img_size (tuple(int)): The image size (h, w).
+            results (dict): The results dict.
         """
 
         assert isinstance(img_size, tuple)
         h, w = img_size[:2]
 
+        key_masks = results[self.instance_key].masks
         x_valid_array = np.ones(w, dtype=np.int32)
         y_valid_array = np.ones(h, dtype=np.int32)
 
-        selected_mask = masks[np.random.randint(0, len(masks))]
+        selected_mask = key_masks[np.random.randint(0, len(key_masks))]
         selected_mask = selected_mask[0].reshape((-1, 2)).astype(np.int32)
         max_x_start = max(np.min(selected_mask[:, 0]) - 2, 0)
         min_x_end = min(np.max(selected_mask[:, 0]) + 3, w - 1)
         max_y_start = max(np.min(selected_mask[:, 1]) - 2, 0)
         min_y_end = min(np.max(selected_mask[:, 1]) + 3, h - 1)
 
-        for mask in masks:
-            assert len(mask) == 1
-            mask = mask[0].reshape((-1, 2)).astype(np.int32)
-            clip_x = np.clip(mask[:, 0], 0, w - 1)
-            clip_y = np.clip(mask[:, 1], 0, h - 1)
-            min_x, max_x = np.min(clip_x), np.max(clip_x)
-            min_y, max_y = np.min(clip_y), np.max(clip_y)
+        for key in results.get('mask_fields', []):
+            if len(results[key].masks) == 0:
+                continue
+            masks = results[key].masks
+            for mask in masks:
+                assert len(mask) == 1
+                mask = mask[0].reshape((-1, 2)).astype(np.int32)
+                clip_x = np.clip(mask[:, 0], 0, w - 1)
+                clip_y = np.clip(mask[:, 1], 0, h - 1)
+                min_x, max_x = np.min(clip_x), np.max(clip_x)
+                min_y, max_y = np.min(clip_y), np.max(clip_y)
 
-            x_valid_array[min_x - 2:max_x + 3] = 0
-            y_valid_array[min_y - 2:max_y + 3] = 0
+                x_valid_array[min_x - 2:max_x + 3] = 0
+                y_valid_array[min_y - 2:max_y + 3] = 0
 
         min_w = int(w * self.min_side_ratio)
         min_h = int(h * self.min_side_ratio)
@@ -458,9 +467,10 @@ class RandomCropPolyInstances:
         return img[bbox[1]:bbox[3], bbox[0]:bbox[2]]
 
     def __call__(self, results):
+        if len(results[self.instance_key].masks) < 1:
+            return results
         if np.random.random_sample() < self.crop_ratio:
-            crop_box = self.sample_crop_box(results['img'].shape,
-                                            results[self.instance_key].masks)
+            crop_box = self.sample_crop_box(results['img'].shape, results)
             results['crop_region'] = crop_box
             img = self.crop_img(results['img'], crop_box)
             results['img'] = img
@@ -580,7 +590,7 @@ class RandomRotatePolyInstances:
             (h_ind, w_ind) = (np.random.randint(0, h * 7 // 8),
                               np.random.randint(0, w * 7 // 8))
             img_cut = img[h_ind:(h_ind + h // 9), w_ind:(w_ind + w // 9)]
-            img_cut = cv2.resize(img_cut, (canvas_size[1], canvas_size[0]))
+            img_cut = mmcv.imresize(img_cut, (canvas_size[1], canvas_size[0]))
             mask = cv2.warpAffine(
                 mask,
                 rotation_matrix, (canvas_size[1], canvas_size[0]),
@@ -663,7 +673,7 @@ class SquareResizePad:
             t_w = self.target_size if h <= w else int(w * self.target_size / h)
         else:
             t_h = t_w = self.target_size
-        img = cv2.resize(img, (t_w, t_h))
+        img = mmcv.imresize(img, (t_w, t_h))
         return img, (t_h, t_w)
 
     def square_pad(self, img):
@@ -678,7 +688,7 @@ class SquareResizePad:
             (h_ind, w_ind) = (np.random.randint(0, h * 7 // 8),
                               np.random.randint(0, w * 7 // 8))
             img_cut = img[h_ind:(h_ind + h // 9), w_ind:(w_ind + w // 9)]
-            expand_img = cv2.resize(img_cut, (pad_size, pad_size))
+            expand_img = mmcv.imresize(img_cut, (pad_size, pad_size))
         if h > w:
             y0, x0 = 0, (h - w) // 2
         else:
@@ -724,4 +734,287 @@ class SquareResizePad:
 
     def __repr__(self):
         repr_str = self.__class__.__name__
+        return repr_str
+
+
+@PIPELINES.register_module()
+class RandomScaling:
+
+    def __init__(self, size=800, scale=(3. / 4, 5. / 2)):
+        """Random scale the image while keeping aspect.
+
+        Args:
+            size (int) : Base size before scaling.
+            scale (tuple(float)) : The range of scaling.
+        """
+        assert isinstance(size, int)
+        assert isinstance(scale, float) or isinstance(scale, tuple)
+        self.size = size
+        self.scale = scale if isinstance(scale, tuple) \
+            else (1 - scale, 1 + scale)
+
+    def __call__(self, results):
+        image = results['img']
+        h, w, _ = results['img_shape']
+
+        aspect_ratio = np.random.uniform(min(self.scale), max(self.scale))
+        scales = self.size * 1.0 / max(h, w) * aspect_ratio
+        scales = np.array([scales, scales])
+        out_size = (int(h * scales[1]), int(w * scales[0]))
+        image = mmcv.imresize(image, out_size[::-1])
+
+        results['img'] = image
+        results['img_shape'] = image.shape
+
+        for key in results.get('mask_fields', []):
+            if len(results[key].masks) == 0:
+                continue
+            results[key] = results[key].resize(out_size)
+
+        return results
+
+
+@PIPELINES.register_module()
+class RandomCropFlip:
+
+    def __init__(self,
+                 pad_ratio=0.1,
+                 crop_ratio=0.5,
+                 iter_num=1,
+                 min_area_ratio=0.2):
+        """Random crop and flip a patch of the image.
+
+        Args:
+            crop_ratio (float): The ratio of cropping.
+            iter_num (int): Number of operations.
+            min_area_ratio (float): Minimal area ratio between cropped patch
+                and original image.
+        """
+        assert isinstance(crop_ratio, float)
+        assert isinstance(iter_num, int)
+        assert isinstance(min_area_ratio, float)
+
+        self.pad_ratio = pad_ratio
+        self.epsilon = 1e-2
+        self.crop_ratio = crop_ratio
+        self.iter_num = iter_num
+        self.min_area_ratio = min_area_ratio
+
+    def __call__(self, results):
+        for i in range(self.iter_num):
+            results = self.random_crop_flip(results)
+        return results
+
+    def random_crop_flip(self, results):
+        image = results['img']
+        polygons = results['gt_masks'].masks
+        ignore_polygons = results['gt_masks_ignore'].masks
+        all_polygons = polygons + ignore_polygons
+        if len(polygons) == 0:
+            return results
+
+        if np.random.random() >= self.crop_ratio:
+            return results
+
+        h, w, _ = results['img_shape']
+        area = h * w
+        pad_h = int(h * self.pad_ratio)
+        pad_w = int(w * self.pad_ratio)
+        h_axis, w_axis = self.generate_crop_target(image, all_polygons, pad_h,
+                                                   pad_w)
+        if len(h_axis) == 0 or len(w_axis) == 0:
+            return results
+
+        attempt = 0
+        while attempt < 10:
+            attempt += 1
+            polys_keep = []
+            polys_new = []
+            ign_polys_keep = []
+            ign_polys_new = []
+            xx = np.random.choice(w_axis, size=2)
+            xmin = np.min(xx) - pad_w
+            xmax = np.max(xx) - pad_w
+            xmin = np.clip(xmin, 0, w - 1)
+            xmax = np.clip(xmax, 0, w - 1)
+            yy = np.random.choice(h_axis, size=2)
+            ymin = np.min(yy) - pad_h
+            ymax = np.max(yy) - pad_h
+            ymin = np.clip(ymin, 0, h - 1)
+            ymax = np.clip(ymax, 0, h - 1)
+            if (xmax - xmin) * (ymax - ymin) < area * self.min_area_ratio:
+                # area too small
+                continue
+
+            pts = np.stack([[xmin, xmax, xmax, xmin],
+                            [ymin, ymin, ymax, ymax]]).T.astype(np.int32)
+            pp = plg(pts)
+            fail_flag = False
+            for polygon in polygons:
+                ppi = plg(polygon[0].reshape(-1, 2))
+                ppiou = eval_utils.poly_intersection(ppi, pp)
+                if np.abs(ppiou - float(ppi.area)) > self.epsilon and \
+                        np.abs(ppiou) > self.epsilon:
+                    fail_flag = True
+                    break
+                elif np.abs(ppiou - float(ppi.area)) < self.epsilon:
+                    polys_new.append(polygon)
+                else:
+                    polys_keep.append(polygon)
+
+            for polygon in ignore_polygons:
+                ppi = plg(polygon[0].reshape(-1, 2))
+                ppiou = eval_utils.poly_intersection(ppi, pp)
+                if np.abs(ppiou - float(ppi.area)) > self.epsilon and \
+                        np.abs(ppiou) > self.epsilon:
+                    fail_flag = True
+                    break
+                elif np.abs(ppiou - float(ppi.area)) < self.epsilon:
+                    ign_polys_new.append(polygon)
+                else:
+                    ign_polys_keep.append(polygon)
+
+            if fail_flag:
+                continue
+            else:
+                break
+
+        cropped = image[ymin:ymax, xmin:xmax, :]
+        select_type = np.random.randint(3)
+        if select_type == 0:
+            img = np.ascontiguousarray(cropped[:, ::-1])
+        elif select_type == 1:
+            img = np.ascontiguousarray(cropped[::-1, :])
+        else:
+            img = np.ascontiguousarray(cropped[::-1, ::-1])
+        image[ymin:ymax, xmin:xmax, :] = img
+        results['img'] = image
+
+        if len(polys_new) + len(ign_polys_new) != 0:
+            height, width, _ = cropped.shape
+            if select_type == 0:
+                for idx, polygon in enumerate(polys_new):
+                    poly = polygon[0].reshape(-1, 2)
+                    poly[:, 0] = width - poly[:, 0] + 2 * xmin
+                    polys_new[idx] = [poly.reshape(-1, )]
+                for idx, polygon in enumerate(ign_polys_new):
+                    poly = polygon[0].reshape(-1, 2)
+                    poly[:, 0] = width - poly[:, 0] + 2 * xmin
+                    ign_polys_new[idx] = [poly.reshape(-1, )]
+            elif select_type == 1:
+                for idx, polygon in enumerate(polys_new):
+                    poly = polygon[0].reshape(-1, 2)
+                    poly[:, 1] = height - poly[:, 1] + 2 * ymin
+                    polys_new[idx] = [poly.reshape(-1, )]
+                for idx, polygon in enumerate(ign_polys_new):
+                    poly = polygon[0].reshape(-1, 2)
+                    poly[:, 1] = height - poly[:, 1] + 2 * ymin
+                    ign_polys_new[idx] = [poly.reshape(-1, )]
+            else:
+                for idx, polygon in enumerate(polys_new):
+                    poly = polygon[0].reshape(-1, 2)
+                    poly[:, 0] = width - poly[:, 0] + 2 * xmin
+                    poly[:, 1] = height - poly[:, 1] + 2 * ymin
+                    polys_new[idx] = [poly.reshape(-1, )]
+                for idx, polygon in enumerate(ign_polys_new):
+                    poly = polygon[0].reshape(-1, 2)
+                    poly[:, 0] = width - poly[:, 0] + 2 * xmin
+                    poly[:, 1] = height - poly[:, 1] + 2 * ymin
+                    ign_polys_new[idx] = [poly.reshape(-1, )]
+            polygons = polys_keep + polys_new
+            ignore_polygons = ign_polys_keep + ign_polys_new
+            results['gt_masks'] = PolygonMasks(polygons, *(image.shape[:2]))
+            results['gt_masks_ignore'] = PolygonMasks(ignore_polygons,
+                                                      *(image.shape[:2]))
+
+        return results
+
+    def generate_crop_target(self, image, all_polys, pad_h, pad_w):
+        """Generate crop target and make sure not to crop the polygon
+        instances.
+
+        Args:
+            image (ndarray): The image waited to be crop.
+            all_polys (list[list[ndarray]]): All polygons including ground
+                truth polygons and ground truth ignored polygons.
+            pad_h (int): Padding length of height.
+            pad_w (int): Padding length of width.
+        Returns:
+            h_axis (ndarray): Vertical cropping range.
+            w_axis (ndarray): Horizontal cropping range.
+        """
+        h, w, _ = image.shape
+        h_array = np.zeros((h + pad_h * 2), dtype=np.int32)
+        w_array = np.zeros((w + pad_w * 2), dtype=np.int32)
+
+        text_polys = []
+        for polygon in all_polys:
+            rect = cv2.minAreaRect(polygon[0].astype(np.int32).reshape(-1, 2))
+            box = cv2.boxPoints(rect)
+            box = np.int0(box)
+            text_polys.append([box[0], box[1], box[2], box[3]])
+
+        polys = np.array(text_polys, dtype=np.int32)
+        for poly in polys:
+            poly = np.round(poly, decimals=0).astype(np.int32)
+            minx = np.min(poly[:, 0])
+            maxx = np.max(poly[:, 0])
+            w_array[minx + pad_w:maxx + pad_w] = 1
+            miny = np.min(poly[:, 1])
+            maxy = np.max(poly[:, 1])
+            h_array[miny + pad_h:maxy + pad_h] = 1
+
+        h_axis = np.where(h_array == 0)[0]
+        w_axis = np.where(w_array == 0)[0]
+        return h_axis, w_axis
+
+
+@PIPELINES.register_module()
+class PyramidRescale:
+    """Resize the image to the base shape, downsample it with gaussian pyramid,
+    and rescale it back to original size.
+
+    Adapted from https://github.com/FangShancheng/ABINet.
+
+    Args:
+        factor (int): The decay factor from base size, or the number of
+            downsampling operations from the base layer.
+        base_shape (tuple(int)): The shape of the base layer of the pyramid.
+        randomize_factor (bool): If True, the final factor would be a random
+            integer in [0, factor].
+
+    :Required Keys:
+        - | ``img`` (ndarray): The input image.
+
+    :Affected Keys:
+        :Modified:
+            - | ``img`` (ndarray): The modified image.
+    """
+
+    def __init__(self, factor=4, base_shape=(128, 512), randomize_factor=True):
+        assert isinstance(factor, int)
+        assert isinstance(base_shape, list) or isinstance(base_shape, tuple)
+        assert len(base_shape) == 2
+        assert isinstance(randomize_factor, bool)
+        self.factor = factor if not randomize_factor else np.random.randint(
+            0, factor + 1)
+        self.base_w, self.base_h = base_shape
+
+    def __call__(self, results):
+        assert 'img' in results
+        if self.factor == 0:
+            return results
+        img = results['img']
+        src_h, src_w = img.shape[:2]
+        scale_img = mmcv.imresize(img, (self.base_w, self.base_h))
+        for _ in range(self.factor):
+            scale_img = cv2.pyrDown(scale_img)
+        scale_img = mmcv.imresize(scale_img, (src_w, src_h))
+        results['img'] = scale_img
+        return results
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'(factor={self.factor}, '
+        repr_str += f'basew={self.basew}, baseh={self.baseh})'
         return repr_str

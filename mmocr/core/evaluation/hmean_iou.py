@@ -1,3 +1,4 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import numpy as np
 
 import mmocr.utils as utils
@@ -9,7 +10,7 @@ def eval_hmean_iou(pred_boxes,
                    gt_ignored_boxes,
                    iou_thr=0.5,
                    precision_thr=0.5):
-    """Evalute hmean of text detection using IOU standard.
+    """Evaluate hmean of text detection using IOU standard.
 
     Args:
         pred_boxes (list[list[list[float]]]): Text boxes for an img list. Each

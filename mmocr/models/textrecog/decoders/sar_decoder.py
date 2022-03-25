@@ -1,3 +1,4 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import math
 
 import torch
@@ -13,17 +14,17 @@ from .base_decoder import BaseDecoder
 class ParallelSARDecoder(BaseDecoder):
     """Implementation Parallel Decoder module in `SAR.
 
-    <https://arxiv.org/abs/1811.00751>`_
+    <https://arxiv.org/abs/1811.00751>`_.
 
     Args:
-        number_classes (int): Output class number.
+        num_classes (int): Output class number :math:`C`.
         channels (list[int]): Network layer channels.
         enc_bi_rnn (bool): If True, use bidirectional RNN in encoder.
         dec_bi_rnn (bool): If True, use bidirectional RNN in decoder.
         dec_do_rnn (float): Dropout of RNN layer in decoder.
         dec_gru (bool): If True, use GRU, else LSTM in decoder.
-        d_model (int): Dim of channels from backbone.
-        d_enc (int): Dim of encoder RNN layer.
+        d_model (int): Dim of channels from backbone :math:`D_i`.
+        d_enc (int): Dim of encoder RNN layer :math:`D_m`.
         d_k (int): Dim of channels of attention module.
         pred_dropout (float): Dropout probability of prediction layer.
         max_seq_len (int): Maximum sequence length for decoding.
@@ -32,6 +33,13 @@ class ParallelSARDecoder(BaseDecoder):
         padding_idx (int): Index of padding token.
         pred_concat (bool): If True, concat glimpse feature from
             attention with holistic feature and hidden state.
+        init_cfg (dict or list[dict], optional): Initialization configs.
+
+    Warning:
+        This decoder will not predict the final class which is assumed to be
+        `<PAD>`. Therefore, its output size is always :math:`C - 1`. `<PAD>`
+        is also ignored by loss as specified in
+        :obj:`mmocr.models.textrecog.recognizer.EncodeDecodeRecognizer`.
     """
 
     def __init__(self,
@@ -49,8 +57,9 @@ class ParallelSARDecoder(BaseDecoder):
                  start_idx=0,
                  padding_idx=92,
                  pred_concat=False,
+                 init_cfg=None,
                  **kwargs):
-        super().__init__()
+        super().__init__(init_cfg=init_cfg)
 
         self.num_classes = num_classes
         self.enc_bi_rnn = enc_bi_rnn
@@ -89,7 +98,8 @@ class ParallelSARDecoder(BaseDecoder):
         self.pred_dropout = nn.Dropout(pred_dropout)
         pred_num_classes = num_classes - 1  # ignore padding_idx in prediction
         if pred_concat:
-            fc_in_channel = decoder_rnn_out_size + d_model + d_enc
+            fc_in_channel = decoder_rnn_out_size + d_model + \
+                            encoder_rnn_out_size
         else:
             fc_in_channel = d_model
         self.prediction = nn.Linear(fc_in_channel, pred_num_classes)
@@ -152,6 +162,20 @@ class ParallelSARDecoder(BaseDecoder):
         return y
 
     def forward_train(self, feat, out_enc, targets_dict, img_metas):
+        """
+        Args:
+            feat (Tensor): Tensor of shape :math:`(N, D_i, H, W)`.
+            out_enc (Tensor): Encoder output of shape
+                :math:`(N, D_m, H, W)`.
+            targets_dict (dict): A dict with the key ``padded_targets``, a
+                tensor of shape :math:`(N, T)`. Each element is the index of a
+                character.
+            img_metas (dict): A dict that contains meta information of input
+                images. Preferably with the key ``valid_ratio``.
+
+        Returns:
+            Tensor: A raw logit tensor of shape :math:`(N, T, C-1)`.
+        """
         if img_metas is not None:
             assert utils.is_type_list(img_metas, dict)
             assert len(img_metas) == feat.size(0)
@@ -176,6 +200,17 @@ class ParallelSARDecoder(BaseDecoder):
         return out_dec[:, 1:, :]  # bsz * seq_len * num_classes
 
     def forward_test(self, feat, out_enc, img_metas):
+        """
+        Args:
+            feat (Tensor): Tensor of shape :math:`(N, D_i, H, W)`.
+            out_enc (Tensor): Encoder output of shape
+                :math:`(N, D_m, H, W)`.
+            img_metas (dict): A dict that contains meta information of input
+                images. Preferably with the key ``valid_ratio``.
+
+        Returns:
+            Tensor: A raw logit tensor of shape :math:`(N, T, C-1)`.
+        """
         if img_metas is not None:
             assert utils.is_type_list(img_metas, dict)
             assert len(img_metas) == feat.size(0)
@@ -227,14 +262,14 @@ class SequentialSARDecoder(BaseDecoder):
     <https://arxiv.org/abs/1811.00751>`_.
 
     Args:
-        number_classes (int): Number of output class.
+        num_classes (int): Output class number :math:`C`.
         enc_bi_rnn (bool): If True, use bidirectional RNN in encoder.
         dec_bi_rnn (bool): If True, use bidirectional RNN in decoder.
         dec_do_rnn (float): Dropout of RNN layer in decoder.
         dec_gru (bool): If True, use GRU, else LSTM in decoder.
         d_k (int): Dim of conv layers in attention module.
-        d_model (int): Dim of channels from backbone.
-        d_enc (int): Dim of encoder RNN layer.
+        d_model (int): Dim of channels from backbone :math:`D_i`.
+        d_enc (int): Dim of encoder RNN layer :math:`D_m`.
         pred_dropout (float): Dropout probability of prediction layer.
         max_seq_len (int): Maximum sequence length during decoding.
         mask (bool): If True, mask padding in feature map.
@@ -258,8 +293,9 @@ class SequentialSARDecoder(BaseDecoder):
                  start_idx=0,
                  padding_idx=92,
                  pred_concat=False,
+                 init_cfg=None,
                  **kwargs):
-        super().__init__()
+        super().__init__(init_cfg=init_cfg)
 
         self.num_classes = num_classes
         self.enc_bi_rnn = enc_bi_rnn
@@ -354,6 +390,20 @@ class SequentialSARDecoder(BaseDecoder):
         return y, hx1, hx1, hx2, hx2
 
     def forward_train(self, feat, out_enc, targets_dict, img_metas=None):
+        """
+        Args:
+            feat (Tensor): Tensor of shape :math:`(N, D_i, H, W)`.
+            out_enc (Tensor): Encoder output of shape
+                :math:`(N, D_m, H, W)`.
+            targets_dict (dict): A dict with the key ``padded_targets``, a
+                tensor of shape :math:`(N, T)`. Each element is the index of a
+                character.
+            img_metas (dict): A dict that contains meta information of input
+                images. Preferably with the key ``valid_ratio``.
+
+        Returns:
+            Tensor: A raw logit tensor of shape :math:`(N, T, C-1)`.
+        """
         if img_metas is not None:
             assert utils.is_type_list(img_metas, dict)
             assert len(img_metas) == feat.size(0)
@@ -410,6 +460,17 @@ class SequentialSARDecoder(BaseDecoder):
         return outputs
 
     def forward_test(self, feat, out_enc, img_metas):
+        """
+        Args:
+            feat (Tensor): Tensor of shape :math:`(N, D_i, H, W)`.
+            out_enc (Tensor): Encoder output of shape
+                :math:`(N, D_m, H, W)`.
+            img_metas (dict): A dict that contains meta information of input
+                images. Preferably with the key ``valid_ratio``.
+
+        Returns:
+            Tensor: A raw logit tensor of shape :math:`(N, T, C-1)`.
+        """
         if img_metas is not None:
             assert utils.is_type_list(img_metas, dict)
             assert len(img_metas) == feat.size(0)

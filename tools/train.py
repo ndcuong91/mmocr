@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# Copyright (c) OpenMMLab. All rights reserved.
 import argparse
 import copy
 import os
@@ -7,21 +9,25 @@ import warnings
 
 import mmcv
 import torch
+import torch.distributed as dist
 from mmcv import Config, DictAction
 from mmcv.runner import get_dist_info, init_dist, set_random_seed
 from mmcv.utils import get_git_hash
 
 from mmocr import __version__
-from mmocr.apis import train_detector
+from mmocr.apis import init_random_seed, train_detector
 from mmocr.datasets import build_dataset
 from mmocr.models import build_detector
-from mmocr.utils import collect_env, get_root_logger
+from mmocr.utils import (collect_env, get_root_logger, is_2dlist,
+                         setup_multi_processes)
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector.')
     parser.add_argument('config', help='Train config file path.')
     parser.add_argument('--work-dir', help='The dir to save logs and models.')
+    parser.add_argument(
+        '--load-from', help='The checkpoint file to load from.')
     parser.add_argument(
         '--resume-from', help='The checkpoint file to resume from.')
     parser.add_argument(
@@ -32,15 +38,25 @@ def parse_args():
     group_gpus.add_argument(
         '--gpus',
         type=int,
-        help='Number of gpus to use '
+        help='(Deprecated, please use --gpu-id) number of gpus to use '
         '(only applicable to non-distributed training).')
     group_gpus.add_argument(
         '--gpu-ids',
         type=int,
         nargs='+',
-        help='ids of gpus to use '
-        '(only applicable to non-distributed training).')
+        help='(Deprecated, please use --gpu-id) ids of gpus to use '
+        '(only applicable to non-distributed training)')
+    group_gpus.add_argument(
+        '--gpu-id',
+        type=int,
+        default=0,
+        help='id of gpu to use '
+        '(only applicable to non-distributed training)')
     parser.add_argument('--seed', type=int, default=None, help='Random seed.')
+    parser.add_argument(
+        '--diff_seed',
+        action='store_true',
+        help='Whether or not set different seeds for different ranks')
     parser.add_argument(
         '--deterministic',
         action='store_true',
@@ -68,11 +84,6 @@ def parse_args():
         default='none',
         help='Options for job launcher.')
     parser.add_argument('--local_rank', type=int, default=0)
-    parser.add_argument(
-        '--mc-config',
-        type=str,
-        default='',
-        help='Memory cache config for image loading speed-up during training.')
 
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
@@ -96,21 +107,8 @@ def main():
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
 
-    # update mc config
-    if args.mc_config:
-        mc = Config.fromfile(args.mc_config)
-        if isinstance(cfg.data.train, list):
-            for i in range(len(cfg.data.train)):
-                cfg.data.train[i].pipeline[0].update(
-                    file_client_args=mc['mc_file_client_args'])
-        else:
-            cfg.data.train.pipeline[0].update(
-                file_client_args=mc['mc_file_client_args'])
+    setup_multi_processes(cfg)
 
-    # import modules from string list.
-    if cfg.get('custom_imports', None):
-        from mmcv.utils import import_modules_from_strings
-        import_modules_from_strings(**cfg['custom_imports'])
     # set cudnn_benchmark
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
@@ -124,12 +122,23 @@ def main():
         # use config filename as default work_dir if cfg.work_dir is None
         cfg.work_dir = osp.join('./work_dirs',
                                 osp.splitext(osp.basename(args.config))[0])
+    if args.load_from is not None:
+        cfg.load_from = args.load_from
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
+    if args.gpus is not None:
+        cfg.gpu_ids = range(1)
+        warnings.warn('`--gpus` is deprecated because we only support '
+                      'single GPU mode in non-distributed training. '
+                      'Use `gpus=1` now.')
     if args.gpu_ids is not None:
-        cfg.gpu_ids = args.gpu_ids
-    else:
-        cfg.gpu_ids = range(1) if args.gpus is None else range(args.gpus)
+        cfg.gpu_ids = args.gpu_ids[0:1]
+        warnings.warn('`--gpu-ids` is deprecated, please use `--gpu-id`. '
+                      'Because we only support single GPU mode in '
+                      'non-distributed training. Use the first GPU '
+                      'in `gpu_ids` now.')
+    if args.gpus is None and args.gpu_ids is None:
+        cfg.gpu_ids = [args.gpu_id]
 
     # init distributed env first, since logger depends on the dist info.
     if args.launcher == 'none':
@@ -166,23 +175,39 @@ def main():
     logger.info(f'Config:\n{cfg.pretty_text}')
 
     # set random seeds
-    if args.seed is not None:
-        logger.info(f'Set random seed to {args.seed}, '
-                    f'deterministic: {args.deterministic}')
-        set_random_seed(args.seed, deterministic=args.deterministic)
-    cfg.seed = args.seed
-    meta['seed'] = args.seed
+    seed = init_random_seed(args.seed)
+    seed = seed + dist.get_rank() if args.diff_seed else seed
+    logger.info(f'Set random seed to {seed}, '
+                f'deterministic: {args.deterministic}')
+    set_random_seed(seed, deterministic=args.deterministic)
+    cfg.seed = seed
+    meta['seed'] = seed
     meta['exp_name'] = osp.basename(args.config)
 
     model = build_detector(
         cfg.model,
         train_cfg=cfg.get('train_cfg'),
         test_cfg=cfg.get('test_cfg'))
+    model.init_weights()
 
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
-        val_dataset.pipeline = cfg.data.train.pipeline
+        if cfg.data.train.get('pipeline', None) is None:
+            if is_2dlist(cfg.data.train.datasets):
+                train_pipeline = cfg.data.train.datasets[0][0].pipeline
+            else:
+                train_pipeline = cfg.data.train.datasets[0].pipeline
+        elif is_2dlist(cfg.data.train.pipeline):
+            train_pipeline = cfg.data.train.pipeline[0]
+        else:
+            train_pipeline = cfg.data.train.pipeline
+
+        if val_dataset['type'] in ['ConcatDataset', 'UniformConcatDataset']:
+            for dataset in val_dataset['datasets']:
+                dataset.pipeline = train_pipeline
+        else:
+            val_dataset.pipeline = train_pipeline
         datasets.append(build_dataset(val_dataset))
     if cfg.checkpoint_config is not None:
         # save mmdet version, config file content and class names in

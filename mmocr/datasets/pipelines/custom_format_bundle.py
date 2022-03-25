@@ -1,8 +1,9 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import numpy as np
 from mmcv.parallel import DataContainer as DC
-
 from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines.formating import DefaultFormatBundle
+
 from mmocr.core.visualize import overlay_mask_img, show_feature
 
 

@@ -1,14 +1,16 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import copy
+import warnings
 from os import path as osp
 
 import numpy as np
 import torch
-
-import mmocr.utils as utils
 from mmdet.datasets.builder import DATASETS
+
 from mmocr.core import compute_f1_score
 from mmocr.datasets.base_dataset import BaseDataset
-from mmocr.datasets.pipelines.crop import sort_vertex
+from mmocr.datasets.pipelines import sort_vertex8
+from mmocr.utils import is_type_list, list_from_file
 
 
 @DATASETS.register_module()
@@ -28,37 +30,48 @@ class KIEDataset(BaseDataset):
     """
 
     def __init__(self,
-                 ann_file,
-                 loader,
-                 dict_file,
+                 ann_file=None,
+                 loader=None,
+                 dict_file=None,
                  img_prefix='',
                  pipeline=None,
                  norm=10.,
                  directed=False,
                  test_mode=True,
                  **kwargs):
-        super().__init__(
-            ann_file,
-            loader,
-            pipeline,
-            img_prefix=img_prefix,
-            test_mode=test_mode)
-        assert osp.exists(dict_file)
+        if ann_file is None and loader is None:
+            warnings.warn(
+                'KIEDataset is only initialized as a downstream demo task '
+                'of text detection and recognition '
+                'without an annotation file.', UserWarning)
+        else:
+            super().__init__(
+                ann_file,
+                loader,
+                pipeline,
+                img_prefix=img_prefix,
+                test_mode=test_mode)
+            assert osp.exists(dict_file)
 
         self.norm = norm
         self.directed = directed
-
-        self.dict = dict({'': 0})
-        with open(dict_file, 'r') as fr:
-            idx = 1
-            for line in fr:
-                char = line.strip()
-                self.dict[char] = idx
-                idx += 1
+        self.dict = {
+            '': 0,
+            **{
+                line.rstrip('\r\n'): ind
+                for ind, line in enumerate(list_from_file(dict_file), 1)
+            }
+        }
 
     def pre_pipeline(self, results):
         results['img_prefix'] = self.img_prefix
         results['bbox_fields'] = []
+        results['ori_texts'] = results['ann_info']['ori_texts']
+        results['filename'] = osp.join(self.img_prefix,
+                                       results['img_info']['filename'])
+        results['ori_filename'] = results['img_info']['filename']
+        # a dummy img data
+        results['img'] = np.zeros((0, 0, 0), dtype=np.uint8)
 
     def _parse_anno_info(self, annotations):
         """Parse annotations of boxes, texts and labels for one image.
@@ -70,7 +83,7 @@ class KIEDataset(BaseDataset):
             dict: A dict containing the following keys:
 
                 - bboxes (np.ndarray): Bbox in one image with shape:
-                    box_num * 4.
+                    box_num * 4. They are sorted clockwise when loading.
                 - relations (np.ndarray): Relations between bbox with shape:
                     box_num * box_num * D.
                 - texts (np.ndarray): Text index with shape:
@@ -79,26 +92,21 @@ class KIEDataset(BaseDataset):
                     box_num * (box_num + 1).
         """
 
-        assert utils.is_type_list(annotations, dict)
+        assert is_type_list(annotations, dict)
+        assert len(annotations) > 0, 'Please remove data with empty annotation'
         assert 'box' in annotations[0]
         assert 'text' in annotations[0]
-        assert 'label' in annotations[0]
 
         boxes, texts, text_inds, labels, edges = [], [], [], [], []
         for ann in annotations:
             box = ann['box']
-            x_list, y_list = box[0:8:2], box[1:9:2]
-            sorted_x_list, sorted_y_list = sort_vertex(x_list, y_list)
-            sorted_box = []
-            for x, y in zip(sorted_x_list, sorted_y_list):
-                sorted_box.append(x)
-                sorted_box.append(y)
+            sorted_box = sort_vertex8(box[:8])
             boxes.append(sorted_box)
             text = ann['text']
             texts.append(ann['text'])
             text_ind = [self.dict[c] for c in text if c in self.dict]
             text_inds.append(text_ind)
-            labels.append(ann['label'])
+            labels.append(ann.get('label', 0))
             edges.append(ann.get('edge', 0))
 
         ann_infos = dict(
@@ -156,13 +164,13 @@ class KIEDataset(BaseDataset):
         node_preds = []
         node_gts = []
         for idx, result in enumerate(results):
-            node_preds.append(result['nodes'])
+            node_preds.append(result['nodes'].cpu())
             box_ann_infos = self.data_infos[idx]['annotations']
             node_gt = [box_ann_info['label'] for box_ann_info in box_ann_infos]
             node_gts.append(torch.Tensor(node_gt))
 
         node_preds = torch.cat(node_preds)
-        node_gts = torch.cat(node_gts).int().to(node_preds.device)
+        node_gts = torch.cat(node_gts).int()
 
         node_f1s = compute_f1_score(node_preds, node_gts, ignores)
 
@@ -173,6 +181,7 @@ class KIEDataset(BaseDataset):
     def list_to_numpy(self, ann_infos):
         """Convert bboxes, relations, texts and labels to ndarray."""
         boxes, text_inds = ann_infos['boxes'], ann_infos['text_inds']
+        texts = ann_infos['texts']
         boxes = np.array(boxes, np.int32)
         relations, bboxes = self.compute_relation(boxes)
 
@@ -194,6 +203,7 @@ class KIEDataset(BaseDataset):
             bboxes=bboxes,
             relations=relations,
             texts=padded_text_inds,
+            ori_texts=texts,
             labels=labels)
 
     def pad_text_indices(self, text_inds):
@@ -206,13 +216,21 @@ class KIEDataset(BaseDataset):
 
     def compute_relation(self, boxes):
         """Compute relation between every two boxes."""
-        x1s, y1s = boxes[:, 0:1], boxes[:, 1:2]
-        x2s, y2s = boxes[:, 4:5], boxes[:, 5:6]
-        ws, hs = x2s - x1s + 1, np.maximum(y2s - y1s + 1, 1)
-        dxs = (x1s[:, 0][None] - x1s) / self.norm
-        dys = (y1s[:, 0][None] - y1s) / self.norm
-        xhhs, xwhs = hs[:, 0][None] / hs, ws[:, 0][None] / hs
-        whs = ws / hs + np.zeros_like(xhhs)
-        relations = np.stack([dxs, dys, whs, xhhs, xwhs], -1)
-        bboxes = np.concatenate([x1s, y1s, x2s, y2s], -1).astype(np.float32)
-        return relations, bboxes
+        # Get minimal axis-aligned bounding boxes for each of the boxes
+        # yapf: disable
+        bboxes = np.concatenate(
+            [boxes[:, 0::2].min(axis=1, keepdims=True),
+             boxes[:, 1::2].min(axis=1, keepdims=True),
+             boxes[:, 0::2].max(axis=1, keepdims=True),
+             boxes[:, 1::2].max(axis=1, keepdims=True)],
+            axis=1).astype(np.float32)
+        # yapf: enable
+        x1, y1 = bboxes[:, 0:1], bboxes[:, 1:2]
+        x2, y2 = bboxes[:, 2:3], bboxes[:, 3:4]
+        w, h = np.maximum(x2 - x1 + 1, 1), np.maximum(y2 - y1 + 1, 1)
+        dx = (x1.T - x1) / self.norm
+        dy = (y1.T - y1) / self.norm
+        xhh, xwh = h.T / h, w.T / h
+        whs = w / h + np.zeros_like(xhh)
+        relation = np.stack([dx, dy, whs, xhh, xwh], -1).astype(np.float32)
+        return relation, bboxes

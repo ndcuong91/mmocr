@@ -1,5 +1,22 @@
 <div align="center">
   <img src="resources/mmocr-logo.png" width="500px"/>
+  <div>&nbsp;</div>
+  <div align="center">
+    <b><font size="5">OpenMMLab 官网</font></b>
+    <sup>
+      <a href="https://openmmlab.com">
+        <i><font size="4">HOT</font></i>
+      </a>
+    </sup>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    <b><font size="5">OpenMMLab 开放平台</font></b>
+    <sup>
+      <a href="https://platform.openmmlab.com">
+        <i><font size="4">TRY IT OUT</font></i>
+      </a>
+    </sup>
+  </div>
+  <div>&nbsp;</div>
 </div>
 
 ## 简介
@@ -16,9 +33,9 @@
 
 MMOCR 是基于 PyTorch 和 mmdetection 的开源工具箱，专注于文本检测，文本识别以及相应的下游任务，如关键信息提取。 它是 OpenMMLab 项目的一部分。
 
-主分支目前支持 **PyTorch 1.5 以上**的版本。
+主分支目前支持 **PyTorch 1.6 以上**的版本。
 
-文档：https://mmocr.readthedocs.io/en/latest/。
+文档：https://mmocr.readthedocs.io/zh_CN/latest/
 
 <div align="left">
   <img src="resources/illustration.jpg"/>
@@ -37,7 +54,7 @@ MMOCR 是基于 PyTorch 和 mmdetection 的开源工具箱，专注于文本检�
 -**模块化设计**
 
   MMOCR 的模块化设计使用户可以定义自己的优化器，数据预处理器，模型组件如主干模块，颈部模块和头部模块，以及损失函数。有关如何构建自定义模型的信
-息，请参考[快速入门](docs/getting_started.md)。
+息，请参考[快速入门](https://mmocr.readthedocs.io/zh_CN/latest/getting_started.html)。
 
 -**众多实用工具**
 
@@ -47,21 +64,46 @@ MMOCR 是基于 PyTorch 和 mmdetection 的开源工具箱，专注于文本检�
 支持的算法：
 
 <details open>
-<summary>(click to collapse)</summary>
+<summary>文字检测</summary>
 
 - [x] [DBNet](configs/textdet/dbnet/README.md) (AAAI'2020)
 - [x] [Mask R-CNN](configs/textdet/maskrcnn/README.md) (ICCV'2017)
 - [x] [PANet](configs/textdet/panet/README.md) (ICCV'2019)
 - [x] [PSENet](configs/textdet/psenet/README.md) (CVPR'2019)
 - [x] [TextSnake](configs/textdet/textsnake/README.md) (ECCV'2018)
-- [x] [CRNN](configs/textrecog/crnn/crnn_academic_dataset.py) (TPAMI'2016)
+- [x] [DRRG](configs/textdet/drrg/README.md) (CVPR'2020)
+- [x] [FCENet](configs/textdet/fcenet/README.md) (CVPR'2021)
+
+</details>
+
+<details open>
+<summary>文字识别</summary>
+
+- [x] [ABINet](configs/textrecog/abinet/README.md) (CVPR'2021)
+- [x] [CRNN](configs/textrecog/crnn/README.md) (TPAMI'2016)
 - [x] [NRTR](configs/textrecog/nrtr/README.md) (ICDAR'2019)
 - [x] [RobustScanner](configs/textrecog/robust_scanner/README.md) (ECCV'2020)
 - [x] [SAR](configs/textrecog/sar/README.md) (AAAI'2019)
-- [x] [SegOCR](configs/bottom_up/higherhrnet/README.md) (Manuscript'2021)
+- [x] [SATRN](configs/textrecog/satrn/README.md) (CVPR'2020 Workshop on Text and Documents in the Deep Learning Era)
+- [x] [SegOCR](configs/textrecog/seg/README.md) (Manuscript'2021)
+
+</details>
+
+<details open>
+<summary>关键信息提取</summary>
+
 - [x] [SDMG-R](configs/kie/sdmgr/README.md) (ArXiv'2021)
 
 </details>
+
+<details open>
+<summary>命名实体识别</summary>
+
+- [x] [Bert-Softmax](configs/ner/bert_softmax/README.md) (NAACL'2019)
+
+</details>
+
+请点击[模型库](https://mmocr.readthedocs.io/en/latest/modelzoo.html)查看更多关于上述算法的详细信息。
 
 ## 开源许可证
 
@@ -72,29 +114,25 @@ MMOCR 是基于 PyTorch 和 mmdetection 的开源工具箱，专注于文本检�
 如果您发现此项目对您的研究有用，请考虑引用：
 
 ```bibtex
-@misc{mmocr2021,
+@article{mmocr2021,
     title={MMOCR:  A Comprehensive Toolbox for Text Detection, Recognition and Understanding},
-    author={MMOCR Contributors},
-    howpublished = {\url{https://github.com/open-mmlab/mmocr}},
+    author={Kuang, Zhanghui and Sun, Hongbin and Li, Zhizhong and Yue, Xiaoyu and Lin, Tsui Hin and Chen, Jianyong and Wei, Huaqiang and Zhu, Yiqin and Gao, Tong and Zhang, Wenwei and Chen, Kai and Zhang, Wayne and Lin, Dahua},
+    journal= {arXiv preprint arXiv:2108.06543},
     year={2021}
 }
 ```
 
 ## 更新日志
 
-最新的月度版本 v0.1.0 在 2021.04.07 发布。
-
-## 模型以及测试结果
-
-测试结果和模型可以在[模型库](https://mmocr.readthedocs.io/en/latest/index.html)中找到。
+最新的月度版本 v0.4.1 在 2022.01.27 发布。
 
 ## 安装
 
-请参考[安装文档](docs/install.md)进行安装。
+请参考[安装文档](https://mmocr.readthedocs.io/zh_CN/latest/install.html)进行安装。
 
 ## 快速入门
 
-请参考[快速入门](docs/getting_started.md)文档学习 MMOCR 的基本使用。
+请参考[快速入门](https://mmocr.readthedocs.io/zh_CN/latest/getting_started.html)文档学习 MMOCR 的基本使用。
 
 ## 贡献指南
 
@@ -106,13 +144,40 @@ MMOCR 是一款由来自不同高校和企业的研发人员共同参与贡献�
 ## OpenMMLab 的其他项目
 
 
-- [MMCV](https://github.com/open-mmlab/mmcv): OpenMMLab 计算机视觉基础库
-- [MMClassification](https://github.com/open-mmlab/mmclassification): OpenMMLab 图像分类工具箱与测试基准
-- [MMDetection](https://github.com/open-mmlab/mmdetection): OpenMMLab 检测工具箱与测试基准
-- [MMDetection3D](https://github.com/open-mmlab/mmdetection3d): OpenMMLab 新一代通用3D目标检测平台
-- [MMSegmentation](https://github.com/open-mmlab/mmsegmentation): OpenMMLab 语义分割工具箱与测试基准
-- [MMAction2](https://github.com/open-mmlab/mmaction2): OpenMMLab 新一代视频理解工具箱与测试基准
+- [MIM](https://github.com/open-mmlab/mim): MIM 是 OpenMMlab 项目、算法、模型的统一入口
+- [MMClassification](https://github.com/open-mmlab/mmclassification): OpenMMLab 图像分类工具箱
+- [MMDetection](https://github.com/open-mmlab/mmdetection): OpenMMLab 目标检测工具箱
+- [MMDetection3D](https://github.com/open-mmlab/mmdetection3d): OpenMMLab 新一代通用 3D 目标检测平台
+- [MMRotate](https://github.com/open-mmlab/mmrotate): OpenMMLab 旋转框检测工具箱与测试基准
+- [MMSegmentation](https://github.com/open-mmlab/mmsegmentation): OpenMMLab 语义分割工具箱
+- [MMOCR](https://github.com/open-mmlab/mmocr): OpenMMLab 全流程文字检测识别理解工具箱
+- [MMPose](https://github.com/open-mmlab/mmpose): OpenMMLab 姿态估计工具箱
+- [MMHuman3D](https://github.com/open-mmlab/mmhuman3d): OpenMMLab 人体参数化模型工具箱与测试基准
+- [MMSelfSup](https://github.com/open-mmlab/mmselfsup): OpenMMLab 自监督学习工具箱与测试基准
+- [MMRazor](https://github.com/open-mmlab/mmrazor): OpenMMLab 模型压缩工具箱与测试基准
+- [MMFewShot](https://github.com/open-mmlab/mmfewshot): OpenMMLab 少样本学习工具箱与测试基准
+- [MMAction2](https://github.com/open-mmlab/mmaction2): OpenMMLab 新一代视频理解工具箱
 - [MMTracking](https://github.com/open-mmlab/mmtracking): OpenMMLab 一体化视频目标感知平台
-- [MMPose](https://github.com/open-mmlab/mmpose): OpenMMLab 姿态估计工具箱与测试基准
+- [MMFlow](https://github.com/open-mmlab/mmflow): OpenMMLab 光流估计工具箱与测试基准
 - [MMEditing](https://github.com/open-mmlab/mmediting): OpenMMLab 图像视频编辑工具箱
-- [MMOCR](https://github.com/open-mmlab/mmocr): OpenMMLab 全流程文字检测识别理解工具包.
+- [MMGeneration](https://github.com/open-mmlab/mmgeneration): OpenMMLab 图片视频生成模型工具箱
+- [MMDeploy](https://github.com/open-mmlab/mmdeploy): OpenMMLab 模型部署框架
+
+## 欢迎加入 OpenMMLab 社区
+
+扫描下方的二维码可关注 OpenMMLab 团队的 [知乎官方账号](https://www.zhihu.com/people/openmmlab)，加入 OpenMMLab 团队的 [官方交流 QQ 群](https://jq.qq.com/?_wv=1027&k=aCvMxdr3)
+
+<div align="center">
+<img src="resources/zhihu_qrcode.jpg" height="400" />  <img src="resources/qq_group_qrcode.jpg" height="400" />
+</div>
+
+我们会在 OpenMMLab 社区为大家
+
+- 📢 分享 AI 框架的前沿核心技术
+- 💻 解读 PyTorch 常用模块源码
+- 📰 发布 OpenMMLab 的相关新闻
+- 🚀 介绍 OpenMMLab 开发的前沿算法
+- 🏃 获取更高效的问题答疑和意见反馈
+- 🔥 提供与各行各业开发者充分交流的平台
+
+干货满满 📘，等你来撩 💗，OpenMMLab 社区期待您的加入 👬

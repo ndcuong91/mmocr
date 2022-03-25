@@ -1,8 +1,8 @@
-import cv2
+# Copyright (c) OpenMMLab. All rights reserved.
 import imgaug
 import imgaug.augmenters as iaa
+import mmcv
 import numpy as np
-
 from mmdet.core.mask import PolygonMasks
 from mmdet.datasets.builder import PIPELINES
 
@@ -16,15 +16,15 @@ class AugmenterBuilder:
     def build(self, args, root=True):
         if args is None:
             return None
-        elif isinstance(args, (int, float, str)):
+        if isinstance(args, (int, float, str)):
             return args
-        elif isinstance(args, list):
+        if isinstance(args, list):
             if root:
                 sequence = [self.build(value, root=False) for value in args]
                 return iaa.Sequential(sequence)
             arg_list = [self.to_tuple_if_list(a) for a in args[1:]]
             return getattr(iaa, args[0])(*arg_list)
-        elif isinstance(args, dict):
+        if isinstance(args, dict):
             if 'cls' in args:
                 cls = getattr(iaa, args['cls'])
                 return cls(
@@ -37,8 +37,7 @@ class AugmenterBuilder:
                     key: self.build(value, root=False)
                     for key, value in args.items()
                 }
-        else:
-            raise RuntimeError('unknown augmenter arg: ' + str(args))
+        raise RuntimeError('unknown augmenter arg: ' + str(args))
 
     def to_tuple_if_list(self, obj):
         if isinstance(obj, list):
@@ -85,36 +84,47 @@ class ImgAug:
     def may_augment_annotation(self, aug, shape, target_shape, results):
         if aug is None:
             return results
+
+        # augment polygon mask
         for key in results['mask_fields']:
-            # augment polygon mask
-            masks = []
-            for mask in results[key]:
-                masks.append(
-                    [self.may_augment_poly(aug, shape, target_shape, mask[0])])
+            masks = self.may_augment_poly(aug, shape, results[key])
             if len(masks) > 0:
                 results[key] = PolygonMasks(masks, *target_shape[:2])
 
+        # augment bbox
         for key in results['bbox_fields']:
-            # augment bbox
-            bboxes = []
-            for bbox in results[key]:
-                bbox = self.may_augment_poly(aug, shape, target_shape, bbox)
-                bboxes.append(bbox)
+            bboxes = self.may_augment_poly(
+                aug, shape, results[key], mask_flag=False)
             results[key] = np.zeros(0)
             if len(bboxes) > 0:
                 results[key] = np.stack(bboxes)
 
         return results
 
-    def may_augment_poly(self, aug, img_shape, target_shape, poly):
-        # poly n x 2
-        poly = poly.reshape(-1, 2)
-        keypoints = [imgaug.Keypoint(p[0], p[1]) for p in poly]
-        keypoints = aug.augment_keypoints(
-            [imgaug.KeypointsOnImage(keypoints, shape=img_shape)])[0].keypoints
-        poly = [[p.x, p.y] for p in keypoints]
-        poly = np.array(poly).flatten()
-        return poly
+    def may_augment_poly(self, aug, img_shape, polys, mask_flag=True):
+        key_points, poly_point_nums = [], []
+        for poly in polys:
+            if mask_flag:
+                poly = poly[0]
+            poly = poly.reshape(-1, 2)
+            key_points.extend([imgaug.Keypoint(p[0], p[1]) for p in poly])
+            poly_point_nums.append(poly.shape[0])
+        key_points = aug.augment_keypoints(
+            [imgaug.KeypointsOnImage(keypoints=key_points,
+                                     shape=img_shape)])[0].keypoints
+
+        new_polys = []
+        start_idx = 0
+        for poly_point_num in poly_point_nums:
+            new_poly = []
+            for key_point in key_points[start_idx:(start_idx +
+                                                   poly_point_num)]:
+                new_poly.append([key_point.x, key_point.y])
+            start_idx += poly_point_num
+            new_poly = np.array(new_poly).flatten()
+            new_polys.append([new_poly] if mask_flag else new_poly)
+
+        return new_polys
 
     def __repr__(self):
         repr_str = self.__class__.__name__
@@ -146,7 +156,7 @@ class EastRandomCrop:
         padded_img = np.zeros(
             (self.target_size[1], self.target_size[0], img.shape[2]),
             img.dtype)
-        padded_img[:h, :w] = cv2.resize(
+        padded_img[:h, :w] = mmcv.imresize(
             img[crop_y:crop_y + crop_h, crop_x:crop_x + crop_w], (w, h))
 
         # for bboxes
@@ -211,7 +221,7 @@ class EastRandomCrop:
         xmax = np.clip(xmax, 0, max_size - 1)
         return xmin, xmax
 
-    def region_wise_random_select(self, regions, max_size):
+    def region_wise_random_select(self, regions):
         selected_index = list(np.random.choice(len(regions), 2))
         selected_values = []
         for index in selected_index:
@@ -247,11 +257,11 @@ class EastRandomCrop:
 
         for i in range(self.max_tries):
             if len(w_regions) > 1:
-                xmin, xmax = self.region_wise_random_select(w_regions, w)
+                xmin, xmax = self.region_wise_random_select(w_regions)
             else:
                 xmin, xmax = self.random_select(w_axis, w)
             if len(h_regions) > 1:
-                ymin, ymax = self.region_wise_random_select(h_regions, h)
+                ymin, ymax = self.region_wise_random_select(h_regions)
             else:
                 ymin, ymax = self.random_select(h_axis, h)
 

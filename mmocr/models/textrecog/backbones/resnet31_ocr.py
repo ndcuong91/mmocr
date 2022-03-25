@@ -1,13 +1,14 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import torch.nn as nn
-from mmcv.cnn import kaiming_init, uniform_init
+from mmcv.runner import BaseModule, Sequential
 
 import mmocr.utils as utils
-from mmdet.models.builder import BACKBONES
+from mmocr.models.builder import BACKBONES
 from mmocr.models.textrecog.layers import BasicBlock
 
 
 @BACKBONES.register_module()
-class ResNet31OCR(nn.Module):
+class ResNet31OCR(BaseModule):
     """Implement ResNet backbone for text recognition, modified from
       `ResNet <https://arxiv.org/pdf/1512.03385.pdf>`_
     Args:
@@ -26,13 +27,16 @@ class ResNet31OCR(nn.Module):
                  channels=[64, 128, 256, 256, 512, 512, 512],
                  out_indices=None,
                  stage4_pool_cfg=dict(kernel_size=(2, 1), stride=(2, 1)),
-                 last_stage_pool=False):
-        super().__init__()
+                 last_stage_pool=False,
+                 init_cfg=[
+                     dict(type='Kaiming', layer='Conv2d'),
+                     dict(type='Uniform', layer='BatchNorm2d')
+                 ]):
+        super().__init__(init_cfg=init_cfg)
         assert isinstance(base_channels, int)
         assert utils.is_type_list(layers, int)
         assert utils.is_type_list(channels, int)
-        assert out_indices is None or (isinstance(out_indices, list)
-                                       or isinstance(out_indices, tuple))
+        assert out_indices is None or isinstance(out_indices, (list, tuple))
         assert isinstance(last_stage_pool, bool)
 
         self.out_indices = out_indices
@@ -86,20 +90,12 @@ class ResNet31OCR(nn.Module):
         self.bn5 = nn.BatchNorm2d(channels[5])
         self.relu5 = nn.ReLU(inplace=True)
 
-    def init_weights(self, pretrained=None):
-        # initialize weight and bias
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                kaiming_init(m)
-            elif isinstance(m, nn.BatchNorm2d):
-                uniform_init(m)
-
     def _make_layer(self, input_channels, output_channels, blocks):
         layers = []
         for _ in range(blocks):
             downsample = None
             if input_channels != output_channels:
-                downsample = nn.Sequential(
+                downsample = Sequential(
                     nn.Conv2d(
                         input_channels,
                         output_channels,
@@ -113,7 +109,7 @@ class ResNet31OCR(nn.Module):
                     input_channels, output_channels, downsample=downsample))
             input_channels = output_channels
 
-        return nn.Sequential(*layers)
+        return Sequential(*layers)
 
     def forward(self, x):
 

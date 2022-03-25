@@ -3,26 +3,25 @@ img_norm_cfg = dict(
 max_scale, min_scale = 1024, 512
 
 train_pipeline = [
-    dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations'),
-    dict(type='Resize', img_scale=(max_scale, min_scale), keep_ratio=True),
-    dict(type='RandomFlip', flip_ratio=0.),
-    dict(type='Normalize', **img_norm_cfg),
-    dict(type='Pad', size_divisor=32),
+    dict(
+        type='ResizeNoImg', img_scale=(max_scale, min_scale), keep_ratio=True),
     dict(type='KIEFormatBundle'),
     dict(
         type='Collect',
-        keys=['img', 'relations', 'texts', 'gt_bboxes', 'gt_labels'])
+        keys=['img', 'relations', 'texts', 'gt_bboxes', 'gt_labels'],
+        meta_keys=('filename', 'ori_texts'))
 ]
 test_pipeline = [
-    dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations'),
-    dict(type='Resize', img_scale=(max_scale, min_scale), keep_ratio=True),
-    dict(type='RandomFlip', flip_ratio=0.),
-    dict(type='Normalize', **img_norm_cfg),
-    dict(type='Pad', size_divisor=32),
+    dict(
+        type='ResizeNoImg', img_scale=(max_scale, min_scale), keep_ratio=True),
     dict(type='KIEFormatBundle'),
-    dict(type='Collect', keys=['img', 'relations', 'texts', 'gt_bboxes'])
+    dict(
+        type='Collect',
+        keys=['img', 'relations', 'texts', 'gt_bboxes'],
+        meta_keys=('filename', 'ori_texts', 'img_norm_cfg', 'ori_filename',
+                   'img_shape'))
 ]
 
 dataset_type = 'KIEDataset'
@@ -53,7 +52,13 @@ test = dict(
     test_mode=True)
 
 data = dict(
-    samples_per_gpu=4, workers_per_gpu=0, train=train, val=test, test=test)
+    samples_per_gpu=4,
+    workers_per_gpu=1,
+    val_dataloader=dict(samples_per_gpu=1),
+    test_dataloader=dict(samples_per_gpu=1),
+    train=train,
+    val=test,
+    test=test)
 
 evaluation = dict(
     interval=1,

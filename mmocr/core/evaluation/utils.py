@@ -1,5 +1,6 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import numpy as np
-import Polygon as plg
+from shapely.geometry import Polygon as plg
 
 import mmocr.utils as utils
 
@@ -43,8 +44,8 @@ def ignore_pred(pred_boxes, gt_ignored_index, gt_polys, precision_thr):
         # if its overlap with any ignored gt > precision_thr
         for ignored_box_id in gt_ignored_index:
             ignored_box = gt_polys[ignored_box_id]
-            inter_area, _ = poly_intersection(poly, ignored_box)
-            area = poly.area()
+            inter_area = poly_intersection(poly, ignored_box)
+            area = poly.area
             precision = 0 if area == 0 else inter_area / area
             if precision > precision_thr:
                 pred_ignored_index.append(box_id)
@@ -112,7 +113,7 @@ def box2polygon(box):
         [box[0], box[1], box[2], box[1], box[2], box[3], box[0], box[3]])
 
     point_mat = boundary.reshape([-1, 2])
-    return plg.Polygon(point_mat)
+    return plg(point_mat)
 
 
 def points2polygon(points):
@@ -132,53 +133,101 @@ def points2polygon(points):
     assert (points.size % 2 == 0) and (points.size >= 8)
 
     point_mat = points.reshape([-1, 2])
-    return plg.Polygon(point_mat)
+    return plg(point_mat)
 
 
-def poly_intersection(poly_det, poly_gt):
+def poly_make_valid(poly):
+    """Convert a potentially invalid polygon to a valid one by eliminating
+    self-crossing or self-touching parts.
+
+    Args:
+        poly (Polygon): A polygon needed to be converted.
+
+    Returns:
+        A valid polygon.
+    """
+    return poly if poly.is_valid else poly.buffer(0)
+
+
+def poly_intersection(poly_det, poly_gt, invalid_ret=None, return_poly=False):
     """Calculate the intersection area between two polygon.
 
     Args:
         poly_det (Polygon): A polygon predicted by detector.
         poly_gt (Polygon): A gt polygon.
+        invalid_ret (None|float|int): The return value when the invalid polygon
+            exists. If it is not specified, the function allows the computation
+            to proceed with invalid polygons by cleaning the their
+            self-touching or self-crossing parts.
+        return_poly (bool): Whether to return the polygon of the intersection
+            area.
 
     Returns:
         intersection_area (float): The intersection area between two polygons.
+        poly_obj (Polygon, optional): The Polygon object of the intersection
+            area. Set as `None` if the input is invalid.
     """
-    assert isinstance(poly_det, plg.Polygon)
-    assert isinstance(poly_gt, plg.Polygon)
+    assert isinstance(poly_det, plg)
+    assert isinstance(poly_gt, plg)
+    assert invalid_ret is None or isinstance(invalid_ret, float) or \
+        isinstance(invalid_ret, int)
 
-    poly_inter = poly_det & poly_gt
-    if len(poly_inter) == 0:
-        return 0, poly_inter
-    return poly_inter.area(), poly_inter
+    if invalid_ret is None:
+        poly_det = poly_make_valid(poly_det)
+        poly_gt = poly_make_valid(poly_gt)
+
+    poly_obj = None
+    area = invalid_ret
+    if poly_det.is_valid and poly_gt.is_valid:
+        poly_obj = poly_det.intersection(poly_gt)
+        area = poly_obj.area
+    return (area, poly_obj) if return_poly else area
 
 
-def poly_union(poly_det, poly_gt):
+def poly_union(poly_det, poly_gt, invalid_ret=None, return_poly=False):
     """Calculate the union area between two polygon.
-
     Args:
         poly_det (Polygon): A polygon predicted by detector.
         poly_gt (Polygon): A gt polygon.
+        invalid_ret (None|float|int): The return value when the invalid polygon
+            exists. If it is not specified, the function allows the computation
+            to proceed with invalid polygons by cleaning the their
+            self-touching or self-crossing parts.
+        return_poly (bool): Whether to return the polygon of the intersection
+            area.
 
     Returns:
         union_area (float): The union area between two polygons.
+        poly_obj (Polygon|MultiPolygon, optional): The Polygon or MultiPolygon
+            object of the union of the inputs. The type of object depends on
+            whether they intersect or not. Set as `None` if the input is
+            invalid.
     """
-    assert isinstance(poly_det, plg.Polygon)
-    assert isinstance(poly_gt, plg.Polygon)
+    assert isinstance(poly_det, plg)
+    assert isinstance(poly_gt, plg)
+    assert invalid_ret is None or isinstance(invalid_ret, float) or \
+        isinstance(invalid_ret, int)
 
-    area_det = poly_det.area()
-    area_gt = poly_gt.area()
-    area_inters, _ = poly_intersection(poly_det, poly_gt)
-    return area_det + area_gt - area_inters
+    if invalid_ret is None:
+        poly_det = poly_make_valid(poly_det)
+        poly_gt = poly_make_valid(poly_gt)
+
+    poly_obj = None
+    area = invalid_ret
+    if poly_det.is_valid and poly_gt.is_valid:
+        poly_obj = poly_det.union(poly_gt)
+        area = poly_obj.area
+    return (area, poly_obj) if return_poly else area
 
 
-def boundary_iou(src, target):
+def boundary_iou(src, target, zero_division=0):
     """Calculate the IOU between two boundaries.
 
     Args:
        src (list): Source boundary.
        target (list): Target boundary.
+       zero_division (int|float): The return value when invalid
+                                    boundary exists.
 
     Returns:
        iou (float): The iou between two boundaries.
@@ -188,24 +237,26 @@ def boundary_iou(src, target):
     src_poly = points2polygon(src)
     target_poly = points2polygon(target)
 
-    return poly_iou(src_poly, target_poly)
+    return poly_iou(src_poly, target_poly, zero_division=zero_division)
 
 
-def poly_iou(poly_det, poly_gt):
+def poly_iou(poly_det, poly_gt, zero_division=0):
     """Calculate the IOU between two polygons.
 
     Args:
         poly_det (Polygon): A polygon predicted by detector.
         poly_gt (Polygon): A gt polygon.
+        zero_division (int|float): The return value when invalid
+                                    polygon exists.
 
     Returns:
         iou (float): The IOU between two polygons.
     """
-    assert isinstance(poly_det, plg.Polygon)
-    assert isinstance(poly_gt, plg.Polygon)
-    area_inters, _ = poly_intersection(poly_det, poly_gt)
-
-    return area_inters / poly_union(poly_det, poly_gt)
+    assert isinstance(poly_det, plg)
+    assert isinstance(poly_gt, plg)
+    area_inters = poly_intersection(poly_det, poly_gt)
+    area_union = poly_union(poly_det, poly_gt)
+    return area_inters / area_union if area_union != 0 else zero_division
 
 
 def one2one_match_ic13(gt_id, det_id, recall_mat, precision_mat, recall_thr,
@@ -400,8 +451,8 @@ def filter_2dlist_result(results, scores, score_thr):
     assert 0 <= score_thr <= 1
 
     inds = np.array(scores) > score_thr
-    valid_results = [results[inx] for inx in np.where(inds)[0].tolist()]
-    valid_scores = [scores[inx] for inx in np.where(inds)[0].tolist()]
+    valid_results = [results[idx] for idx in np.where(inds)[0].tolist()]
+    valid_scores = [scores[idx] for idx in np.where(inds)[0].tolist()]
     return valid_results, valid_scores
 
 
@@ -433,14 +484,14 @@ def select_top_boundary(boundaries_list, scores_list, score_thr):
 
     Args:
         boundaries_list (list[list[list[float]]]): List of boundaries.
-            The 1st, 2rd, and 3rd indices are for image, text and
+            The 1st, 2nd, and 3rd indices are for image, text and
             vertice, respectively.
         scores_list (list(list[float])): List of lists of scores.
         score_thr (float): The score threshold to filter out bboxes.
 
     Returns:
         selected_bboxes (list[list[list[float]]]): List of boundaries.
-            The 1st, 2rd, and 3rd indices are for image, text and vertice,
+            The 1st, 2nd, and 3rd indices are for image, text and vertice,
             respectively.
     """
     assert isinstance(boundaries_list, list)

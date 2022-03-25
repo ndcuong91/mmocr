@@ -1,13 +1,15 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import warnings
 
 import mmcv
+from mmdet.core import bbox2roi
 from torch import nn
 from torch.nn import functional as F
 
-from mmdet.core import bbox2roi
-from mmdet.models.builder import DETECTORS, build_roi_extractor
-from mmdet.models.detectors import SingleStageDetector
-from mmocr.core import imshow_edge_node
+from mmocr.core import imshow_edge, imshow_node
+from mmocr.models.builder import DETECTORS, build_roi_extractor
+from mmocr.models.common.detectors import SingleStageDetector
+from mmocr.utils import list_from_file
 
 
 @DETECTORS.register_module()
@@ -27,16 +29,17 @@ class SDMGR(SingleStageDetector):
                  neck=None,
                  bbox_head=None,
                  extractor=dict(
-                     type='SingleRoIExtractor',
+                     type='mmdet.SingleRoIExtractor',
                      roi_layer=dict(type='RoIAlign', output_size=7),
                      featmap_strides=[1]),
                  visual_modality=False,
                  train_cfg=None,
                  test_cfg=None,
-                 pretrained=None,
-                 class_list=None):
-        super().__init__(backbone, neck, bbox_head, train_cfg, test_cfg,
-                         pretrained)
+                 class_list=None,
+                 init_cfg=None,
+                 openset=False):
+        super().__init__(
+            backbone, neck, bbox_head, train_cfg, test_cfg, init_cfg=init_cfg)
         self.visual_modality = visual_modality
         if visual_modality:
             self.extractor = build_roi_extractor({
@@ -47,6 +50,7 @@ class SDMGR(SingleStageDetector):
         else:
             self.extractor = None
         self.class_list = class_list
+        self.openset = openset
 
     def forward_train(self, img, img_metas, relations, texts, gt_bboxes,
                       gt_labels):
@@ -126,26 +130,33 @@ class SDMGR(SingleStageDetector):
 
         idx_to_cls = {}
         if self.class_list is not None:
-            with open(self.class_list, 'r') as fr:
-                for line in fr:
-                    line = line.strip().split()
-                    class_idx, class_label = line
-                    idx_to_cls[class_idx] = class_label
+            for line in list_from_file(self.class_list):
+                class_idx, class_label = line.strip().split()
+                idx_to_cls[class_idx] = class_label
 
         # if out_file specified, do not show image in window
         if out_file is not None:
             show = False
 
-        img, node_pred = imshow_edge_node(
-            img,
-            result,
-            boxes,
-            idx_to_cls=idx_to_cls,
-            show=show,
-            win_name=win_name,
-            wait_time=wait_time,
-            out_file=out_file,
-            ignore_classes=['other'])
+        if self.openset:
+            img = imshow_edge(
+                img,
+                result,
+                boxes,
+                show=show,
+                win_name=win_name,
+                wait_time=wait_time,
+                out_file=out_file)
+        else:
+            img = imshow_node(
+                img,
+                result,
+                boxes,
+                idx_to_cls=idx_to_cls,
+                show=show,
+                win_name=win_name,
+                wait_time=wait_time,
+                out_file=out_file)
 
         if not (show or out_file):
             warnings.warn('show==False and out_file is not specified, only '

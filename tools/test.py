@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# Copyright (c) OpenMMLab. All rights reserved.
 import argparse
 import os
 import warnings
@@ -9,11 +11,14 @@ from mmcv.cnn import fuse_conv_bn
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import (get_dist_info, init_dist, load_checkpoint,
                          wrap_fp16_model)
+from mmdet.apis import multi_gpu_test
 
-from mmdet.apis import multi_gpu_test, single_gpu_test
-from mmdet.datasets import replace_ImageToTensor
+from mmocr.apis.test import single_gpu_test
+from mmocr.apis.utils import (disable_text_recog_aug_test,
+                              replace_image_to_tensor)
 from mmocr.datasets import build_dataloader, build_dataset
 from mmocr.models import build_detector
+from mmocr.utils import revert_sync_batchnorm, setup_multi_processes
 
 
 def parse_args():
@@ -27,6 +32,12 @@ def parse_args():
         action='store_true',
         help='Whether to fuse conv and bn, this will slightly increase'
         'the inference speed.')
+    parser.add_argument(
+        '--gpu-id',
+        type=int,
+        default=0,
+        help='id of gpu to use '
+        '(only applicable to non-distributed testing)')
     parser.add_argument(
         '--format-only',
         action='store_true',
@@ -118,14 +129,13 @@ def main():
     cfg = Config.fromfile(args.config)
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
-    # import modules from string list.
-    if cfg.get('custom_imports', None):
-        from mmcv.utils import import_modules_from_strings
-        import_modules_from_strings(**cfg['custom_imports'])
+    setup_multi_processes(cfg)
+
     # set cudnn_benchmark
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
-    cfg.model.pretrained = None
+    if cfg.model.get('pretrained'):
+        cfg.model.pretrained = None
     if cfg.model.get('neck'):
         if isinstance(cfg.model.neck, list):
             for neck_cfg in cfg.model.neck:
@@ -137,42 +147,50 @@ def main():
                 cfg.model.neck.rfp_backbone.pretrained = None
 
     # in case the test dataset is concatenated
-    samples_per_gpu = 1
-    if isinstance(cfg.data.test, dict):
-        cfg.data.test.test_mode = True
-        samples_per_gpu = cfg.data.test.pop('samples_per_gpu', 1)
-        if samples_per_gpu > 1:
-            # Replace 'ImageToTensor' to 'DefaultFormatBundle'
-            cfg.data.test.pipeline = replace_ImageToTensor(
-                cfg.data.test.pipeline)
-    elif isinstance(cfg.data.test, list):
-        for ds_cfg in cfg.data.test:
-            ds_cfg.test_mode = True
-        samples_per_gpu = max(
-            [ds_cfg.pop('samples_per_gpu', 1) for ds_cfg in cfg.data.test])
-        if samples_per_gpu > 1:
-            for ds_cfg in cfg.data.test:
-                ds_cfg.pipeline = replace_ImageToTensor(ds_cfg.pipeline)
+    samples_per_gpu = (cfg.data.get('test_dataloader', {})).get(
+        'samples_per_gpu', cfg.data.get('samples_per_gpu', 1))
+    if samples_per_gpu > 1:
+        cfg = disable_text_recog_aug_test(cfg)
+        cfg = replace_image_to_tensor(cfg)
 
     # init distributed env first, since logger depends on the dist info.
     if args.launcher == 'none':
+        cfg.gpu_ids = [args.gpu_id]
         distributed = False
     else:
         distributed = True
         init_dist(args.launcher, **cfg.dist_params)
 
     # build the dataloader
-    dataset = build_dataset(cfg.data.test)
-    data_loader = build_dataloader(
-        dataset,
-        samples_per_gpu=samples_per_gpu,
-        workers_per_gpu=cfg.data.workers_per_gpu,
-        dist=distributed,
-        shuffle=False)
+    dataset = build_dataset(cfg.data.test, dict(test_mode=True))
+    # step 1: give default values and override (if exist) from cfg.data
+    loader_cfg = {
+        **dict(seed=cfg.get('seed'), drop_last=False, dist=distributed),
+        **({} if torch.__version__ != 'parrots' else dict(
+               prefetch_num=2,
+               pin_memory=False,
+           )),
+        **dict((k, cfg.data[k]) for k in [
+                   'workers_per_gpu',
+                   'seed',
+                   'prefetch_num',
+                   'pin_memory',
+                   'persistent_workers',
+               ] if k in cfg.data)
+    }
+    test_loader_cfg = {
+        **loader_cfg,
+        **dict(shuffle=False, drop_last=False),
+        **cfg.data.get('test_dataloader', {}),
+        **dict(samples_per_gpu=samples_per_gpu)
+    }
+
+    data_loader = build_dataloader(dataset, **test_loader_cfg)
 
     # build the model and load checkpoint
     cfg.model.train_cfg = None
     model = build_detector(cfg.model, test_cfg=cfg.get('test_cfg'))
+    model = revert_sync_batchnorm(model)
     fp16_cfg = cfg.get('fp16', None)
     if fp16_cfg is not None:
         wrap_fp16_model(model)
@@ -181,9 +199,10 @@ def main():
         model = fuse_conv_bn(model)
 
     if not distributed:
-        model = MMDataParallel(model, device_ids=[0])
+        model = MMDataParallel(model, device_ids=cfg.gpu_ids)
+        is_kie = cfg.model.type in ['SDMGR']
         outputs = single_gpu_test(model, data_loader, args.show, args.show_dir,
-                                  args.show_score_thr)
+                                  is_kie, args.show_score_thr)
     else:
         model = MMDistributedDataParallel(
             model.cuda(),

@@ -1,16 +1,17 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import torch
 import torch.nn.functional as F
-from mmcv.cnn import xavier_init
+from mmcv.runner import BaseModule
 from torch import nn
 
-from mmdet.models.builder import NECKS
+from mmocr.models.builder import NECKS
 
 
-class UpBlock(nn.Module):
+class UpBlock(BaseModule):
     """Upsample block for DRRG and TextSnake."""
 
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
+    def __init__(self, in_channels, out_channels, init_cfg=None):
+        super().__init__(init_cfg=init_cfg)
 
         assert isinstance(in_channels, int)
         assert isinstance(out_channels, int)
@@ -30,17 +31,30 @@ class UpBlock(nn.Module):
 
 
 @NECKS.register_module()
-class FPN_UNET(nn.Module):
+class FPN_UNet(BaseModule):
     """The class for implementing DRRG and TextSnake U-Net-like FPN.
 
-    DRRG: Deep Relational Reasoning Graph Network for Arbitrary Shape
-    Text Detection [https://arxiv.org/abs/2003.07493].
-    TextSnake: A Flexible Representation for Detecting Text of Arbitrary Shapes
-    [https://arxiv.org/abs/1807.01544].
+    DRRG: `Deep Relational Reasoning Graph Network for Arbitrary Shape
+    Text Detection <https://arxiv.org/abs/2003.07493>`_.
+
+    TextSnake: `A Flexible Representation for Detecting Text of Arbitrary
+    Shapes <https://arxiv.org/abs/1807.01544>`_.
+
+    Args:
+        in_channels (list[int]): Number of input channels at each scale. The
+            length of the list should be 4.
+        out_channels (int): The number of output channels.
+        init_cfg (dict or list[dict], optional): Initialization configs.
     """
 
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 init_cfg=dict(
+                     type='Xavier',
+                     layer=['Conv2d', 'ConvTranspose2d'],
+                     distribution='uniform')):
+        super().__init__(init_cfg=init_cfg)
 
         assert len(in_channels) == 4
         assert isinstance(out_channels, int)
@@ -62,14 +76,19 @@ class FPN_UNET(nn.Module):
         self.up_block2 = UpBlock(blocks_in_channels[2], blocks_out_channels[2])
         self.up_block1 = UpBlock(blocks_in_channels[1], blocks_out_channels[1])
         self.up_block0 = UpBlock(blocks_in_channels[0], blocks_out_channels[0])
-        self.init_weights()
-
-    def init_weights(self):
-        for m in self.modules():
-            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
-                xavier_init(m, distribution='uniform')
 
     def forward(self, x):
+        """
+        Args:
+            x (list[Tensor] | tuple[Tensor]): A list of four tensors of shape
+                :math:`(N, C_i, H_i, W_i)`, representing C2, C3, C4, C5
+                features respectively. :math:`C_i` should matches the number in
+                ``in_channels``.
+
+        Returns:
+            Tensor: Shape :math:`(N, C, H, W)` where :math:`H=4H_0` and
+            :math:`W=4W_0`.
+        """
         c2, c3, c4, c5 = x
 
         x = F.relu(self.up4(c5))

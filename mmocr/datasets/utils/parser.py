@@ -1,6 +1,9 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import json
+import warnings
 
 from mmocr.datasets.builder import PARSERS
+from mmocr.utils import StringStrip
 
 
 @PARSERS.register_module()
@@ -17,7 +20,8 @@ class LineStrParser:
     def __init__(self,
                  keys=['filename', 'text'],
                  keys_idx=[0, 1],
-                 separator=' '):
+                 separator=' ',
+                 **kwargs):
         assert isinstance(keys, list)
         assert isinstance(keys_idx, list)
         assert isinstance(separator, str)
@@ -26,14 +30,22 @@ class LineStrParser:
         self.keys = keys
         self.keys_idx = keys_idx
         self.separator = separator
+        self.strip_cls = StringStrip(**kwargs)
 
     def get_item(self, data_ret, index):
         map_index = index % len(data_ret)
         line_str = data_ret[map_index]
-        for split_key in self.separator:
-            if split_key != ' ':
-                line_str = line_str.replace(split_key, ' ')
-        line_str = line_str.split()
+        line_str = self.strip_cls(line_str)
+        if len(line_str.split(' ')) > 2:
+            msg = 'More than two blank spaces were detected. '
+            msg += 'Please use LineJsonParser to handle '
+            msg += 'annotations with blanks. '
+            msg += 'Check Doc '
+            msg += 'https://mmocr.readthedocs.io/en/latest/'
+            msg += 'tutorials/blank_recog.html '
+            msg += 'for details.'
+            warnings.warn(msg)
+        line_str = line_str.split(self.separator)
         if len(line_str) <= max(self.keys_idx):
             raise Exception(
                 f'key index: {max(self.keys_idx)} out of range: {line_str}')
@@ -52,14 +64,15 @@ class LineJsonParser:
         keys (list[str]): Keys in both json-string and result dict.
     """
 
-    def __init__(self, keys=[], **kwargs):
+    def __init__(self, keys=[]):
         assert isinstance(keys, list)
         assert len(keys) > 0
         self.keys = keys
 
     def get_item(self, data_ret, index):
         map_index = index % len(data_ret)
-        line_json_obj = json.loads(data_ret[map_index])
+        json_str = data_ret[map_index]
+        line_json_obj = json.loads(json_str)
         line_info = {}
         for key in self.keys:
             if key not in line_json_obj:

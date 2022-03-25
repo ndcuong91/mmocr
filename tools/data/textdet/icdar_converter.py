@@ -1,3 +1,4 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import argparse
 import glob
 import os.path as osp
@@ -6,9 +7,8 @@ from functools import partial
 import mmcv
 import numpy as np
 from shapely.geometry import Polygon
-from tools.data.utils.common import convert_annotations, is_not_png
 
-from mmocr.utils import drop_orientation
+from mmocr.utils import convert_annotations, list_from_file
 
 
 def collect_files(img_dir, gt_dir):
@@ -32,10 +32,6 @@ def collect_files(img_dir, gt_dir):
     imgs_list = []
     for suffix in suffixes:
         imgs_list.extend(glob.glob(osp.join(img_dir, '*' + suffix)))
-
-    imgs_list = [
-        drop_orientation(f) if is_not_png(f) else f for f in imgs_list
-    ]
 
     files = []
     for img_file in imgs_list:
@@ -91,17 +87,11 @@ def load_img_info(files, dataset):
     img_file, gt_file = files
     # read imgs with ignoring orientations
     img = mmcv.imread(img_file, 'unchanged')
-    # read imgs with orientations as dataloader does when training and testing
-    img_color = mmcv.imread(img_file, 'color')
-    # make sure imgs have no orientations info, or annotation gt is wrong.
-    assert img.shape[0:2] == img_color.shape[0:2]
 
     if dataset == 'icdar2017':
-        with open(gt_file) as f:
-            gt_list = f.readlines()
+        gt_list = list_from_file(gt_file)
     elif dataset == 'icdar2015':
-        with open(gt_file, mode='r', encoding='utf-8-sig') as f:
-            gt_list = f.readlines()
+        gt_list = list_from_file(gt_file, encoding='utf-8-sig')
     else:
         raise NotImplementedError(f'Not support {dataset}')
 
@@ -152,11 +142,12 @@ def parse_args():
     )
     parser.add_argument('icdar_path', help='icdar root path')
     parser.add_argument('-o', '--out-dir', help='output path')
-    parser.add_argument('-d', '--dataset', help='icdar2017 or icdar2015')
+    parser.add_argument(
+        '-d', '--dataset', required=True, help='icdar2017 or icdar2015')
     parser.add_argument(
         '--split-list',
         nargs='+',
-        help='a list of splits. e.g., "--split-list training validation test"')
+        help='a list of splits. e.g., "--split-list training test"')
 
     parser.add_argument(
         '--nproc', default=1, type=int, help='number of process')

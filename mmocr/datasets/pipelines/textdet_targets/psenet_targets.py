@@ -1,4 +1,6 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 from mmdet.datasets.builder import PIPELINES
+
 from . import PANetTargets
 
 

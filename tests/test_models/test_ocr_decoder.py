@@ -1,11 +1,14 @@
+# Copyright (c) OpenMMLab. All rights reserved.
 import math
 
 import pytest
 import torch
 
-from mmocr.models.textrecog.decoders import (BaseDecoder, ParallelSARDecoder,
+from mmocr.models.textrecog.decoders import (ABILanguageDecoder,
+                                             ABIVisionDecoder, BaseDecoder,
+                                             NRTRDecoder, ParallelSARDecoder,
                                              ParallelSARDecoderWithBS,
-                                             SequentialSARDecoder, TFDecoder)
+                                             SequentialSARDecoder)
 from mmocr.models.textrecog.decoders.sar_decoder_with_bs import DecodeNode
 
 
@@ -96,11 +99,11 @@ def test_parallel_sar_decoder_with_beam_search():
 
 
 def test_transformer_decoder():
-    decoder = TFDecoder(num_classes=37, padding_idx=36, max_seq_len=5)
+    decoder = NRTRDecoder(num_classes=37, padding_idx=36, max_seq_len=5)
     decoder.init_weights()
     decoder.train()
 
-    out_enc = torch.rand(1, 512, 1, 25)
+    out_enc = torch.rand(1, 25, 512)
     tgt_dict = {'padded_targets': torch.LongTensor([[1, 1, 1, 1, 36]])}
     img_metas = [{'valid_ratio': 1.0}]
     tgt_dict['padded_targets'] = tgt_dict['padded_targets']
@@ -110,3 +113,22 @@ def test_transformer_decoder():
 
     out_test = decoder(None, out_enc, tgt_dict, img_metas, False)
     assert out_test.shape == torch.Size([1, 5, 36])
+
+
+def test_abi_language_decoder():
+    decoder = ABILanguageDecoder(max_seq_len=25)
+    logits = torch.randn(2, 25, 90)
+    result = decoder(
+        feat=None, out_enc=logits, targets_dict=None, img_metas=None)
+    assert result['feature'].shape == torch.Size([2, 25, 512])
+    assert result['logits'].shape == torch.Size([2, 25, 90])
+
+
+def test_abi_vision_decoder():
+    model = ABIVisionDecoder(
+        in_channels=128, num_channels=16, max_seq_len=10, use_result=None)
+    x = torch.randn(2, 128, 8, 32)
+    result = model(x, None)
+    assert result['feature'].shape == torch.Size([2, 10, 128])
+    assert result['logits'].shape == torch.Size([2, 10, 90])
+    assert result['attn_scores'].shape == torch.Size([2, 10, 8, 32])
