@@ -73,10 +73,12 @@ class BaseConvertor:
 
         indexes = []
         for string in strings:
+            # print('------------------------------------str2idx:',string)
             if self.lower:
                 string = string.lower()
             index = []
             for char in string:
+                # print('------------------------------------char:',char)
                 char_idx = self.char2idx.get(char, self.unknown_idx)
                 if char_idx is None:
                     raise Exception(f'Chararcter: {char} not in dict,'

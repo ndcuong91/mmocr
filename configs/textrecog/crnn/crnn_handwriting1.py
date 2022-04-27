@@ -21,7 +21,7 @@ label_convertor = dict(
 model = dict(
     type='CRNNNet',
     preprocessor=None,
-    backbone=dict(type='VeryDeepVgg', leakyRelu=False, input_channels=1),
+    backbone=dict(type='VeryDeepVgg', leaky_relu=False, input_channels=1),
     encoder=None,
     decoder=dict(type='CRNNDecoder', in_channels=512, rnn_flag=True),
     loss=dict(type='CTCLoss'),
@@ -55,7 +55,7 @@ train_pipeline = [
         type='Collect',
         keys=['img'],
         meta_keys=[
-            'filename', 'ori_shape', 'img_shape', 'text', 'valid_ratio'
+            'filename', 'ori_shape', 'img_shape', 'text', 'valid_ratio','resize_shape'
         ]),
 ]
 test_pipeline = [
@@ -71,7 +71,7 @@ test_pipeline = [
     dict(
         type='Collect',
         keys=['img'],
-        meta_keys=['filename', 'ori_shape', 'img_shape', 'valid_ratio']),
+        meta_keys=['filename', 'ori_shape', 'img_shape', 'valid_ratio','resize_shape']),
 ]
 
 dataset_type = 'OCRDataset'
@@ -89,7 +89,7 @@ train = dict(
             type='LineStrParser',
             keys=['filename', 'text'],
             keys_idx=[0, 1],
-            separator=' ')),
+            separator='\t')),
     pipeline=train_pipeline,
     test_mode=False)
 
@@ -108,7 +108,7 @@ test = dict(
             type='LineStrParser',
             keys=['filename', 'text'],
             keys_idx=[0, 1],
-            separator=' ')),
+            separator='\t')),
     pipeline=test_pipeline,
     test_mode=True)
 
