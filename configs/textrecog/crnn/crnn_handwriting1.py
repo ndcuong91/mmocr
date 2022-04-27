@@ -16,7 +16,7 @@ workflow = [('train', 1)]
 
 # model
 label_convertor = dict(
-    type='CTCConvertor', dict_file='data/textrecog/handwriting1/dict.txt', with_unknown=False, lower=False)
+    type='CTCConvertor', dict_file='/home/cuongnd/PycharmProjects/mmocr/data/textrecog/handwriting1/dict.txt', with_unknown=False, lower=False)
 
 model = dict(
     type='CRNNNet',
@@ -63,8 +63,8 @@ test_pipeline = [
     dict(
         type='ResizeOCR',
         height=32,
-        min_width=4,
-        max_width=None,
+        min_width=32,
+        max_width=1000,
         keep_aspect_ratio=True),
     dict(type='ToTensorOCR'),
     dict(type='NormalizeOCR', **img_norm_cfg),
