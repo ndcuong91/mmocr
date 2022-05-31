@@ -26,7 +26,7 @@ test_pipeline = [
 ]
 
 dataset_type = 'KIEDataset'
-data_root = '/home/vvn/PycharmProjects/mmocr/data/kie/sale_contracts'
+data_root = '/home/cuongnd/home_data/mmocr/kie/sale_contracts'
 
 loader = dict(
     type='HardDiskLoader',
@@ -61,7 +61,11 @@ test = dict(
     test_mode=True)
 
 data = dict(
-    samples_per_gpu=4, workers_per_gpu=0, train=train, val=val, test=test)
+    samples_per_gpu=4,
+    workers_per_gpu=1,
+    val_dataloader=dict(samples_per_gpu=1),
+    test_dataloader=dict(samples_per_gpu=1),
+    train=train, val=val, test=test)
 
 evaluation = dict(
     interval=1,
