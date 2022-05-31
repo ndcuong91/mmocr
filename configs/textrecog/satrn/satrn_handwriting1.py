@@ -1,53 +1,61 @@
-_base_ = []
-checkpoint_config = dict(interval=5)
-# yapf:disable
-log_config = dict(
-    interval=10,
-    hooks=[
-        dict(type='TextLoggerHook')
+_base_ = [
+    '../../_base_/default_runtime.py',
+    '../../_base_/recog_pipelines/satrn_pipeline.py'
+]
 
-    ])
-# yapf:enable
-dist_params = dict(backend='nccl')
-log_level = 'INFO'
-load_from = None
-resume_from = None
-workflow = [('train', 1)]
+# train_list = {{_base_.train_list}}
+# test_list = {{_base_.test_list}}
+#
+# train_pipeline = {{_base_.train_pipeline}}
+# test_pipeline = {{_base_.test_pipeline}}
 
-# model
 label_convertor = dict(
-    type='CTCConvertor', dict_file='/home/cuongnd/PycharmProjects/mmocr/data/textrecog/handwriting1/dict.txt', with_unknown=False, lower=False)
+    type='AttnConvertor',
+    dict_list=list('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz| 0123456789ĂÂÊÔƠƯÁẮẤÉẾÍÓỐỚÚỨÝÀẰẦÈỀÌÒỒỜÙỪỲẢẲẨĐẺỂỈỎỔỞỦỬỶÃẴẪẼỄĨÕỖỠŨỮỸẠẶẬẸỆỊỌỘỢỤỰỴăâêôơưáắấéếíóốớúứýàằầèềìòồờùừỳảẳẩđẻểỉỏổởủửỷãẵẫẽễĩõỗỡũữỹạặậẹệịọộợụựỵ\'*:,@.-(#%")/~!^&_+={}[]\;<>?※”$€£¥₫°²™ā–'), with_unknown=False, lower=False)
 
 model = dict(
-    type='CRNNNet',
-    preprocessor=None,
-    backbone=dict(type='VeryDeepVgg', leaky_relu=False, input_channels=1),
-    encoder=None,
-    decoder=dict(type='CRNNDecoder', in_channels=512, rnn_flag=True),
-    loss=dict(type='CTCLoss'),
+    type='SATRN',
+    backbone=dict(type='ShallowCNN', input_channels=3, hidden_dim=512),
+    encoder=dict(
+        type='SatrnEncoder',
+        n_layers=12,
+        n_head=8,
+        d_k=512 // 8,
+        d_v=512 // 8,
+        d_model=512,
+        n_position=100,
+        d_inner=512 * 4,
+        dropout=0.1),
+    decoder=dict(
+        type='NRTRDecoder',
+        n_layers=6,
+        d_embedding=512,
+        n_head=8,
+        d_model=512,
+        d_inner=512 * 4,
+        d_k=512 // 8,
+        d_v=512 // 8),
+    loss=dict(type='TFLoss'),
     label_convertor=label_convertor,
-    pretrained=None)
-
-train_cfg = None
-test_cfg = None
+    max_seq_len=25)
 
 # optimizer
-optimizer = dict(type='Adadelta', lr=1.0)
+optimizer = dict(type='Adam', lr=3e-4)
 optimizer_config = dict(grad_clip=None)
 # learning policy
-lr_config = dict(policy='step', step=[])
-total_epochs = 100
+lr_config = dict(policy='step', step=[3, 4])
+total_epochs = 6
 
 # data
 img_norm_cfg = dict(mean=[0.5], std=[0.5])
 
 train_pipeline = [
-    dict(type='LoadImageFromFile', color_type='grayscale'),
+    dict(type='LoadImageFromFile'),
     dict(
         type='ResizeOCR',
         height=32,
         min_width=32,
-        max_width=1000,
+        max_width=100,
         keep_aspect_ratio=False),
     dict(type='ToTensorOCR'),
     dict(type='NormalizeOCR', **img_norm_cfg),
@@ -59,12 +67,12 @@ train_pipeline = [
         ]),
 ]
 test_pipeline = [
-    dict(type='LoadImageFromFile', color_type='grayscale'),
+    dict(type='LoadImageFromFile'),
     dict(
         type='ResizeOCR',
         height=32,
         min_width=32,
-        max_width=1000,
+        max_width=100,
         keep_aspect_ratio=True),
     dict(type='ToTensorOCR'),
     dict(type='NormalizeOCR', **img_norm_cfg),
@@ -113,11 +121,11 @@ test = dict(
     test_mode=True)
 
 data = dict(
-    samples_per_gpu=64,
+    samples_per_gpu=16,
     workers_per_gpu=4,
     train=train,
     val= test,
     test=test)
 
 cudnn_benchmark = True
-evaluation = dict(interval=5, metric='acc')
+evaluation = dict(interval=1, metric='acc')

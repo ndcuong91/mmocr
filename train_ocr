@@ -1,2 +1,2 @@
 #./tools/dist_train.sh configs/textrecog/sar/sar_r31_parallel_decoder_handwriting1.py work_dirs/textrecog/sar/handwriting1/ 1
-./tools/dist_train.sh configs/textrecog/crnn/crnn_handwriting1.py work_dirs/textrecog/crnn/handwriting1/ 1
+./tools/dist_train.sh configs/textrecog/satrn/satrn_handwriting1.py work_dirs/textrecog/satrn/handwriting1/ 1
