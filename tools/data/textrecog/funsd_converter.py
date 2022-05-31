@@ -140,9 +140,9 @@ def generate_ann(root_path, split, image_infos, preserve_vertical, format):
 
     dst_image_root = osp.join(root_path, 'dst_imgs', split)
     if split == 'training':
-        dst_label_file = osp.join(root_path, 'train_label.txt')
+        dst_label_file = osp.join(root_path, f'train_label.{format}')
     elif split == 'test':
-        dst_label_file = osp.join(root_path, 'test_label.txt')
+        dst_label_file = osp.join(root_path, f'test_label.{format}')
     os.makedirs(dst_image_root, exist_ok=True)
 
     lines = []
@@ -173,12 +173,13 @@ def generate_ann(root_path, split, image_infos, preserve_vertical, format):
                              f'{word}')
             elif format == 'jsonl':
                 lines.append(
-                    json.dumps({
-                        'filename':
-                        f'{osp.basename(dst_image_root)}/{dst_img_name}',
-                        'text': word
-                    }),
-                    ensure_ascii=False)
+                    json.dumps(
+                        {
+                            'filename':
+                            f'{osp.basename(dst_image_root)}/{dst_img_name}',
+                            'text': word
+                        },
+                        ensure_ascii=False))
             else:
                 raise NotImplementedError
 

@@ -66,7 +66,7 @@ Supported algorithms:
 <details open>
 <summary>Text Detection</summary>
 
-- [x] [DBNet](configs/textdet/dbnet/README.md) (AAAI'2020)
+- [x] [DBNet](configs/textdet/dbnet/README.md) (AAAI'2020) / [DBNet++](configs/textdet/dbnetpp/README.md) (TPAMI'2022)
 - [x] [Mask R-CNN](configs/textdet/maskrcnn/README.md) (ICCV'2017)
 - [x] [PANet](configs/textdet/panet/README.md) (ICCV'2019)
 - [x] [PSENet](configs/textdet/psenet/README.md) (CVPR'2019)
@@ -81,6 +81,7 @@ Supported algorithms:
 
 - [x] [ABINet](configs/textrecog/abinet/README.md) (CVPR'2021)
 - [x] [CRNN](configs/textrecog/crnn/README.md) (TPAMI'2016)
+- [x] [MASTER](configs/textrecog/master/README.md) (PR'2021)
 - [x] [NRTR](configs/textrecog/nrtr/README.md) (ICDAR'2019)
 - [x] [RobustScanner](configs/textrecog/robust_scanner/README.md) (ECCV'2020)
 - [x] [SAR](configs/textrecog/sar/README.md) (AAAI'2019)
@@ -124,11 +125,24 @@ If you find this project useful in your research, please consider cite:
 
 ## Changelog
 
-v0.4.1 was released in 2022-01-27.
+v0.6.0 was released in 2022-05-05.
 
 ## Installation
 
-Please refer to our [Install Guide](https://mmocr.readthedocs.io/en/latest/install.html).
+MMOCR depends on [PyTorch](https://pytorch.org/), [MMCV](https://github.com/open-mmlab/mmcv) and [MMDetection](https://github.com/open-mmlab/mmdetection).
+Below are quick steps for installation.
+Please refer to [Install Guide](https://mmocr.readthedocs.io/en/latest/install.html) for more detailed instruction.
+
+```shell
+conda create -n open-mmlab python=3.8 pytorch=1.10 cudatoolkit=11.3 torchvision -c pytorch -y
+conda activate open-mmlab
+pip3 install openmim
+mim install mmcv-full
+mim install mmdet
+git clone https://github.com/open-mmlab/mmocr.git
+cd mmocr
+pip3 install -e .
+```
 
 ## Get Started
 
@@ -145,6 +159,7 @@ We hope the toolbox and benchmark could serve the growing research community by 
 
 ## Projects in OpenMMLab
 
+- [MMCV](https://github.com/open-mmlab/mmcv): OpenMMLab foundational library for computer vision.
 - [MIM](https://github.com/open-mmlab/mim): MIM installs OpenMMLab packages.
 - [MMClassification](https://github.com/open-mmlab/mmclassification): OpenMMLab image classification toolbox and benchmark.
 - [MMDetection](https://github.com/open-mmlab/mmdetection): OpenMMLab detection toolbox and benchmark.
